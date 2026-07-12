@@ -1,8 +1,49 @@
 import { z } from "zod";
+import type { AIRequestConfig } from "@/lib/domain";
 import { normalizeIdeaWord } from "@/lib/idea-normalization";
 import { MAX_ANALYZABLE_IMAGE_BYTES, MAX_INLINE_DATA_URL_CHARS } from "@/lib/payload-limits";
 
 export const providerIdSchema = z.enum(["openai", "google", "deepseek", "openai-compatible", "mock"]);
+
+const aiModelSchema = z.string().trim().min(1).max(200);
+
+const compatibleBaseURLSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(2_048)
+  .refine((value) => {
+    try {
+      const url = new URL(value);
+      return (
+        url.protocol === "https:" &&
+        !url.username &&
+        !url.password &&
+        !url.search &&
+        !url.hash
+      );
+    } catch {
+      return false;
+    }
+  }, "OpenAI Compatible Base URL 必须是有效的 HTTPS 地址");
+
+/**
+ * Public, non-secret model routing information. The API key is deliberately
+ * excluded and is only supplied directly to the provider factory at runtime.
+ */
+export const aiRequestConfigSchema: z.ZodType<AIRequestConfig> = z.discriminatedUnion("provider", [
+  z.object({ provider: z.literal("mock") }).strict(),
+  z.object({ provider: z.literal("openai"), model: aiModelSchema }).strict(),
+  z.object({ provider: z.literal("google"), model: aiModelSchema }).strict(),
+  z.object({ provider: z.literal("deepseek"), model: aiModelSchema }).strict(),
+  z
+    .object({
+      provider: z.literal("openai-compatible"),
+      model: aiModelSchema,
+      baseURL: compatibleBaseURLSchema,
+    })
+    .strict(),
+]);
 
 export const inspirationIdeaSchema = z.object({
   word: z.string().trim().min(1).max(30),
@@ -99,7 +140,7 @@ export const expandRequestSchema = z.object({
   parentNodeId: z.string().optional(),
   sourceAssetId: z.string().optional(),
   existingWords: z.array(z.string().max(50)).max(200).default([]),
-  provider: providerIdSchema.optional(),
+  ai: aiRequestConfigSchema,
   direction: z.enum(["balanced", "practical", "bold", "cross-domain", "specific"]).default("balanced"),
 });
 
@@ -116,7 +157,7 @@ export const summarizeRequestSchema = z.object({
     )
     .min(3)
     .max(10),
-  provider: providerIdSchema.optional(),
+  ai: aiRequestConfigSchema,
   tone: z.enum(["default", "concise", "professional", "bold", "commercial", "visual"]).default("default"),
 });
 
@@ -127,13 +168,13 @@ export const planRequestSchema = z.object({
     .array(inspirationIdeaSchema.extend({ id: z.string() }))
     .min(3)
     .max(10),
-  provider: providerIdSchema.optional(),
+  ai: aiRequestConfigSchema,
 });
 
 export const promptRequestSchema = z.object({
   projectInfo: projectInfoSchema,
   plan: projectPlanSchema,
-  provider: providerIdSchema.optional(),
+  ai: aiRequestConfigSchema,
 });
 
 export const analyzeAssetRequestSchema = z.object({
@@ -142,7 +183,7 @@ export const analyzeAssetRequestSchema = z.object({
   mimeType: z.string().max(100),
   size: z.number().int().positive().max(MAX_ANALYZABLE_IMAGE_BYTES),
   dataUrl: z.string().max(MAX_INLINE_DATA_URL_CHARS),
-  provider: providerIdSchema.optional(),
+  ai: aiRequestConfigSchema,
 });
 
 export type ExpansionResult = z.infer<typeof expansionResultSchema>;

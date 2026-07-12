@@ -16,9 +16,10 @@ import { WorkflowPanel } from "@/components/shell/workflow-panel";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { prepareAIRequest } from "@/lib/client-ai-config";
 import { MAX_PROJECT_NODES } from "@/lib/defaults";
-import type { ProjectInfo, ProviderStatus, WorkspaceStage } from "@/lib/domain";
-import { parseApiData, postJson } from "@/lib/api-client";
+import type { AIProviderConfig, ProjectInfo, WorkspaceStage } from "@/lib/domain";
+import { parseApiData } from "@/lib/api-client";
 import {
   conceptSummarySchema,
   expansionResultSchema,
@@ -45,10 +46,9 @@ export function IdeaBubbleApp() {
   const createNewProject = useIdeaStore((state) => state.createNewProject);
   const stage = useIdeaStore((state) => state.stage);
   const setStage = useIdeaStore((state) => state.setStage);
-  const provider = useIdeaStore((state) => state.provider);
-  const setProvider = useIdeaStore((state) => state.setProvider);
-  const providerStatus = useIdeaStore((state) => state.providerStatus);
-  const setProviderStatus = useIdeaStore((state) => state.setProviderStatus);
+  const aiConfig = useIdeaStore((state) => state.aiConfig);
+  const setAIConfig = useIdeaStore((state) => state.setAIConfig);
+  const clearAIConfig = useIdeaStore((state) => state.clearAIConfig);
   const saveStatus = useIdeaStore((state) => state.saveStatus);
   const past = useIdeaStore((state) => state.past);
   const future = useIdeaStore((state) => state.future);
@@ -72,18 +72,6 @@ export function IdeaBubbleApp() {
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
-  useEffect(() => {
-    fetch("/api/ai/status")
-      .then((response) => response.json())
-      .then((payload: { data?: ProviderStatus }) => {
-        if (!payload.data) return;
-        setProviderStatus(payload.data);
-        if (!window.localStorage.getItem("idea-bubble:provider")) {
-          useIdeaStore.setState({ provider: payload.data.configuredProvider });
-        }
-      })
-      .catch(() => undefined);
-  }, [setProviderStatus]);
 
   const beginRequest = useCallback(
     (task: BusyTask, projectId: string): ActiveRequest | undefined => {
@@ -126,6 +114,21 @@ export function IdeaBubbleApp() {
     setBusyTask(undefined);
   }, [setBusyTask]);
 
+  const saveAIConfig = useCallback(
+    (config: AIProviderConfig) => {
+      cancelActiveRequest();
+      setError(undefined);
+      setAIConfig(config);
+    },
+    [cancelActiveRequest, setAIConfig, setError],
+  );
+
+  const resetAIConfig = useCallback(() => {
+    cancelActiveRequest();
+    setError(undefined);
+    clearAIConfig();
+  }, [cancelActiveRequest, clearAIConfig, setError]);
+
   useEffect(() => () => cancelActiveRequest(), [cancelActiveRequest]);
 
   const expand = useCallback(
@@ -141,19 +144,21 @@ export function IdeaBubbleApp() {
       const request = beginRequest("expand", current.id);
       if (!request) return;
       try {
+        const { ai, apiKey } = prepareAIRequest(aiConfig, "expand");
+        const { expandInspiration } = await import("@/lib/ai/service");
         const data = parseApiData(
           expansionResultSchema,
-          await postJson<unknown>(
-            "/api/ai/expand",
+          await expandInspiration(
             {
               source,
               parentNodeId: parentId,
               sourceAssetId,
               existingWords: current.nodes.map((node) => node.word),
-              provider,
+              ai,
               direction: "balanced",
             },
             request.controller.signal,
+            apiKey,
           ),
         );
         if (!requestIsCurrent(request)) return;
@@ -166,7 +171,7 @@ export function IdeaBubbleApp() {
         finishRequest(request);
       }
     },
-    [addExpansion, beginRequest, finishRequest, provider, requestIsCurrent, setError, setStage],
+    [addExpansion, aiConfig, beginRequest, finishRequest, requestIsCurrent, setError, setStage],
   );
 
   const summarize = useCallback(
@@ -177,10 +182,11 @@ export function IdeaBubbleApp() {
       const request = beginRequest("summarize", current.id);
       if (!request) return;
       try {
+        const { ai, apiKey } = prepareAIRequest(aiConfig, "summary");
+        const { summarizeCollectedIdeas } = await import("@/lib/ai/service");
         const data = parseApiData(
           conceptSummarySchema,
-          await postJson<unknown>(
-            "/api/ai/summarize",
+          await summarizeCollectedIdeas(
             {
               projectInfo: current.info,
               collectedIdeas: collected.map(({ id, word, category, reason }) => ({
@@ -189,10 +195,11 @@ export function IdeaBubbleApp() {
                 category,
                 reason,
               })),
-              provider,
+              ai,
               tone,
             },
             request.controller.signal,
+            apiKey,
           ),
         );
         if (!requestIsCurrent(request)) return;
@@ -205,7 +212,7 @@ export function IdeaBubbleApp() {
         finishRequest(request);
       }
     },
-    [beginRequest, finishRequest, provider, requestIsCurrent, setConcept, setError, setStage],
+    [aiConfig, beginRequest, finishRequest, requestIsCurrent, setConcept, setError, setStage],
   );
 
   const generatePlan = useCallback(async () => {
@@ -215,10 +222,11 @@ export function IdeaBubbleApp() {
     const request = beginRequest("plan", current.id);
     if (!request) return;
     try {
+      const { ai, apiKey } = prepareAIRequest(aiConfig, "plan");
+      const { generateProjectPlan } = await import("@/lib/ai/service");
       const data = parseApiData(
         projectPlanSchema,
-        await postJson<unknown>(
-          "/api/ai/plan",
+        await generateProjectPlan(
           {
             projectInfo: current.info,
             concept: current.currentConcept,
@@ -230,9 +238,10 @@ export function IdeaBubbleApp() {
               visualHint,
               relevance,
             })),
-            provider,
+            ai,
           },
           request.controller.signal,
+          apiKey,
         ),
       );
       if (!requestIsCurrent(request)) return;
@@ -244,7 +253,7 @@ export function IdeaBubbleApp() {
     } finally {
       finishRequest(request);
     }
-  }, [beginRequest, finishRequest, provider, requestIsCurrent, setError, setPlan, setStage]);
+  }, [aiConfig, beginRequest, finishRequest, requestIsCurrent, setError, setPlan, setStage]);
 
   const generatePrompt = useCallback(async () => {
     const current = useIdeaStore.getState().project;
@@ -252,16 +261,18 @@ export function IdeaBubbleApp() {
     const request = beginRequest("prompt", current.id);
     if (!request) return;
     try {
+      const { ai, apiKey } = prepareAIRequest(aiConfig, "prompt");
+      const { generateImagePrompt } = await import("@/lib/ai/service");
       const data = parseApiData(
         imagePromptSchema,
-        await postJson<unknown>(
-          "/api/ai/prompt",
+        await generateImagePrompt(
           {
             projectInfo: current.info,
             plan: current.currentPlan,
-            provider,
+            ai,
           },
           request.controller.signal,
+          apiKey,
         ),
       );
       if (!requestIsCurrent(request)) return;
@@ -272,7 +283,7 @@ export function IdeaBubbleApp() {
     } finally {
       finishRequest(request);
     }
-  }, [beginRequest, finishRequest, provider, requestIsCurrent, saveImagePrompt, setError]);
+  }, [aiConfig, beginRequest, finishRequest, requestIsCurrent, saveImagePrompt, setError]);
 
   const createProject = useCallback(
     (info: ProjectInfo) => {
@@ -293,8 +304,7 @@ export function IdeaBubbleApp() {
           hasPlan={Boolean(project.currentPlan)}
           stage={stage}
           saveStatus={saveStatus}
-          provider={provider}
-          providerStatus={providerStatus}
+          aiConfig={aiConfig}
           canUndo={past.length > 0}
           canRedo={future.length > 0}
           onStageChange={setStage}
@@ -310,7 +320,8 @@ export function IdeaBubbleApp() {
             cancelActiveRequest();
             setHistoryOpen(true);
           }}
-          onProviderChange={setProvider}
+          onAIConfigSave={saveAIConfig}
+          onAIConfigClear={resetAIConfig}
         />
       )}
 

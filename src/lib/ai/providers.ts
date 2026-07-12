@@ -1,112 +1,74 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 
-import type { AIProviderId, ProviderStatus } from "@/lib/domain";
-import { providerIdSchema } from "@/lib/schemas";
-import type { AITask, LanguageModelSelection } from "@/lib/ai/types";
+import type { AIRequestConfig } from "@/lib/domain";
+import type { LanguageModelSelection } from "@/lib/ai/types";
+import { PublicApiError } from "@/lib/server/errors";
 
-type OpenAIProvider = ReturnType<typeof createOpenAI>;
-type GoogleProvider = ReturnType<typeof createGoogleGenerativeAI>;
+const DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1";
 
-let openAIProvider: OpenAIProvider | undefined;
-let googleProvider: GoogleProvider | undefined;
-let deepSeekProvider: OpenAIProvider | undefined;
-let compatibleProvider: OpenAIProvider | undefined;
+/**
+ * Prevent browser credentials, referrers, caches, and redirects from leaking a
+ * user-supplied API key beyond the explicitly selected provider endpoint.
+ * SDK headers, body, and abort signal are preserved from `init`.
+ */
+const privateProviderFetch: typeof fetch = (input, init) =>
+  fetch(input, {
+    ...init,
+    credentials: "omit",
+    cache: "no-store",
+    referrerPolicy: "no-referrer",
+    redirect: "error",
+  });
 
-const TASK_MODEL_ENV: Record<AITask, string> = {
-  expand: "AI_MODEL_EXPAND",
-  summary: "AI_MODEL_SUMMARY",
-  plan: "AI_MODEL_PLAN",
-  prompt: "AI_MODEL_PROMPT",
-  vision: "AI_MODEL_VISION",
-};
-
-function env(name: string): string | undefined {
-  const value = process.env[name]?.trim();
-  return value || undefined;
+function apiKeyOrThrow(apiKey: string | undefined): string {
+  const normalized = apiKey?.trim();
+  if (!normalized) {
+    throw new PublicApiError("请先在模型设置中填写当前供应商的 API Key。", 401, false);
+  }
+  if (normalized.length > 2_048) {
+    throw new PublicApiError("API Key 格式无效。", 400, false);
+  }
+  return normalized;
 }
 
-function validHttpUrl(value: string | undefined): string | undefined {
-  if (!value) return undefined;
+function modelOrThrow(config: AIRequestConfig): string {
+  const model = config.model?.trim();
+  if (!model) {
+    throw new PublicApiError("请先填写当前任务使用的模型名称。", 400, false);
+  }
+  if (model.length > 200) {
+    throw new PublicApiError("模型名称格式无效。", 400, false);
+  }
+  return model;
+}
+
+function compatibleBaseURLOrThrow(value: string | undefined): string {
   try {
-    const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : undefined;
+    const url = new URL(value ?? "");
+    if (
+      url.protocol !== "https:" ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash
+    ) {
+      throw new Error("invalid URL");
+    }
+    return url.toString().replace(/\/$/u, "");
   } catch {
-    return undefined;
+    throw new PublicApiError("OpenAI Compatible Base URL 必须是有效的 HTTPS 地址。", 400, false);
   }
 }
 
-function configuredProvider(requested?: AIProviderId): AIProviderId {
-  if (requested) return requested;
-  const parsed = providerIdSchema.safeParse(env("AI_PROVIDER") ?? "mock");
-  return parsed.success ? parsed.data : "mock";
-}
-
-function taskModel(task: AITask, provider: AIProviderId): string | undefined {
-  const taskSpecific = env(TASK_MODEL_ENV[task]);
-  if (taskSpecific) return taskSpecific;
-  return provider === "openai-compatible" ? env("CUSTOM_AI_MODEL") : undefined;
-}
-
-function hasProviderCredentials(provider: AIProviderId): boolean {
-  switch (provider) {
-    case "openai":
-      return Boolean(env("OPENAI_API_KEY"));
-    case "google":
-      return Boolean(env("GOOGLE_GENERATIVE_AI_API_KEY"));
-    case "deepseek":
-      return Boolean(env("DEEPSEEK_API_KEY"));
-    case "openai-compatible":
-      return Boolean(env("CUSTOM_AI_API_KEY") && validHttpUrl(env("CUSTOM_AI_BASE_URL")));
-    case "mock":
-      return true;
-  }
-}
-
-function getOpenAIProvider(): OpenAIProvider | null {
-  const apiKey = env("OPENAI_API_KEY");
-  if (!apiKey) return null;
-  openAIProvider ??= createOpenAI({ apiKey });
-  return openAIProvider;
-}
-
-function getGoogleProvider(): GoogleProvider | null {
-  const apiKey = env("GOOGLE_GENERATIVE_AI_API_KEY");
-  if (!apiKey) return null;
-  googleProvider ??= createGoogleGenerativeAI({ apiKey });
-  return googleProvider;
-}
-
-function getDeepSeekProvider(): OpenAIProvider | null {
-  const apiKey = env("DEEPSEEK_API_KEY");
-  if (!apiKey) return null;
-  deepSeekProvider ??= createOpenAI({
-    apiKey,
-    baseURL: validHttpUrl(env("DEEPSEEK_BASE_URL")) ?? "https://api.deepseek.com",
-    name: "deepseek",
-  });
-  return deepSeekProvider;
-}
-
-function getCompatibleProvider(): OpenAIProvider | null {
-  const apiKey = env("CUSTOM_AI_API_KEY");
-  const baseURL = validHttpUrl(env("CUSTOM_AI_BASE_URL"));
-  if (!apiKey || !baseURL) return null;
-  compatibleProvider ??= createOpenAI({
-    apiKey,
-    baseURL,
-    name: "openai-compatible",
-  });
-  return compatibleProvider;
-}
-
-export function getLanguageModel(task: AITask, requestedProvider?: AIProviderId): LanguageModelSelection {
-  const configured = configuredProvider(requestedProvider);
-  const modelName = taskModel(task, configured);
-
-  if (configured === "mock" || !modelName || !hasProviderCredentials(configured)) {
+/**
+ * Creates a fresh provider for every request. Nothing is read from deployment
+ * environment variables or retained in a module-level provider singleton.
+ */
+export function getLanguageModel(config: AIRequestConfig, apiKey?: string): LanguageModelSelection {
+  if (config.provider === "mock") {
     return {
-      configuredProvider: configured,
+      configuredProvider: "mock",
       provider: "mock",
       modelName: "mock",
       model: null,
@@ -114,66 +76,46 @@ export function getLanguageModel(task: AITask, requestedProvider?: AIProviderId)
     };
   }
 
-  const provider =
-    configured === "openai"
-      ? getOpenAIProvider()
-      : configured === "google"
-        ? getGoogleProvider()
-        : configured === "deepseek"
-          ? getDeepSeekProvider()
-          : getCompatibleProvider();
+  const key = apiKeyOrThrow(apiKey);
+  const modelName = modelOrThrow(config);
 
-  if (!provider) {
+  try {
+    if (config.provider === "google") {
+      const provider = createGoogleGenerativeAI({ apiKey: key, fetch: privateProviderFetch });
+      return {
+        configuredProvider: "google",
+        provider: "google",
+        modelName,
+        model: provider(modelName),
+        demoMode: false,
+      };
+    }
+
+    const baseURL =
+      config.provider === "deepseek"
+        ? DEEPSEEK_BASE_URL
+        : config.provider === "openai-compatible"
+          ? compatibleBaseURLOrThrow(config.baseURL)
+          : undefined;
+    const provider = createOpenAI({
+      apiKey: key,
+      ...(baseURL ? { baseURL } : {}),
+      ...(config.provider !== "openai" ? { name: config.provider } : {}),
+      fetch: privateProviderFetch,
+    });
+
     return {
-      configuredProvider: configured,
-      provider: "mock",
-      modelName: "mock",
-      model: null,
-      demoMode: true,
+      configuredProvider: config.provider,
+      provider: config.provider,
+      modelName,
+      model:
+        config.provider === "deepseek" || config.provider === "openai-compatible"
+          ? provider.chat(modelName)
+          : provider(modelName),
+      demoMode: false,
     };
+  } catch (error) {
+    if (error instanceof PublicApiError) throw error;
+    throw new PublicApiError("AI Provider 初始化失败，请检查供应商和模型设置。", 400, false);
   }
-
-  return {
-    configuredProvider: configured,
-    provider: configured,
-    modelName,
-    model: provider(modelName),
-    demoMode: false,
-  };
-}
-
-export function getProviderStatus(): ProviderStatus {
-  const configured = configuredProvider();
-  const tasks: AITask[] = ["expand", "summary", "plan", "prompt", "vision"];
-  const resolved = Object.fromEntries(
-    tasks.map((task) => {
-      const name =
-        configured !== "mock" && hasProviderCredentials(configured)
-          ? (taskModel(task, configured) ?? "mock")
-          : "mock";
-      return [task, name];
-    }),
-  ) as Record<AITask, string>;
-  const hasRealTask = Object.values(resolved).some((name) => name !== "mock");
-  const demoMode = Object.values(resolved).some((name) => name === "mock");
-
-  return {
-    configuredProvider: configured,
-    activeProvider: hasRealTask ? configured : "mock",
-    demoMode,
-    taskModels: {
-      expand: resolved.expand,
-      summary: resolved.summary,
-      plan: resolved.plan,
-      prompt: resolved.prompt,
-      vision: resolved.vision,
-    },
-    availableProviders: {
-      openai: hasProviderCredentials("openai"),
-      google: hasProviderCredentials("google"),
-      deepseek: hasProviderCredentials("deepseek"),
-      "openai-compatible": hasProviderCredentials("openai-compatible"),
-      mock: true,
-    },
-  };
 }

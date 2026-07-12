@@ -5,6 +5,7 @@ const systemChrome = process.env.PLAYWRIGHT_USE_SYSTEM_CHROME === "1" ? { channe
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
+  workers: 2,
   retries: 0,
   timeout: 120_000,
   use: {
@@ -24,6 +25,5 @@ export default defineConfig({
     url: "http://127.0.0.1:3100",
     reuseExistingServer: true,
     timeout: 120_000,
-    env: { AI_PROVIDER: "mock" },
   },
 });

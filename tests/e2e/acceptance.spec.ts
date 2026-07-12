@@ -1,5 +1,59 @@
 import { expect, test, type Page } from "@playwright/test";
 
+const BYOK_STORAGE_KEY = "idea-bubble:ai-config:v1";
+const BYOK_ENDPOINT = "https://provider.example/v1";
+const BYOK_ROUTE = `${BYOK_ENDPOINT}/chat/completions`;
+const BYOK_KEY = "e2e-browser-only-key";
+
+function byokConfig() {
+  return {
+    provider: "openai-compatible",
+    apiKey: BYOK_KEY,
+    baseURL: BYOK_ENDPOINT,
+    models: {
+      expand: "user-expand-model",
+      summary: "user-summary-model",
+      plan: "user-plan-model",
+      prompt: "user-prompt-model",
+      vision: "user-vision-model",
+    },
+  };
+}
+
+async function useBrowserBYOK(page: Page) {
+  await page.addInitScript(({ key, config }) => window.localStorage.setItem(key, JSON.stringify(config)), {
+    key: BYOK_STORAGE_KEY,
+    config: byokConfig(),
+  });
+}
+
+function providerIdeas() {
+  return Array.from({ length: 10 }, (_, index) => ({
+    word: `直连灵感${index}`,
+    category: "结构",
+    reason: `与蜂巢结构相关的浏览器直连灵感 ${index}`,
+    visualHint: `六边形视觉 ${index}`,
+    relevance: 0.8,
+  }));
+}
+
+function chatResponse(output: unknown) {
+  return {
+    id: "chatcmpl-e2e",
+    object: "chat.completion",
+    created: 1,
+    model: "user-expand-model",
+    choices: [
+      {
+        index: 0,
+        message: { role: "assistant", content: JSON.stringify(output) },
+        finish_reason: "stop",
+      },
+    ],
+    usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
+  };
+}
+
 async function createProject(page: Page, name: string) {
   await page.goto("/");
   await page.getByPlaceholder("例如：蜂巢城市通勤鞋").fill(name);
@@ -117,38 +171,58 @@ test.describe("验收回归", () => {
 
   test("畸形响应和断网不会写坏项目，并允许重试", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "桌面容错只运行一次");
+    await useBrowserBYOK(page);
     await createProject(page, "蜂巢容错验收");
 
-    await page.route("**/api/ai/expand", async (route) => {
+    await page.route(BYOK_ROUTE, async (route) => {
+      expect(route.request().headers().authorization).toBe(`Bearer ${BYOK_KEY}`);
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ data: { source: "蜂巢", ideas: [{ word: "不足" }] } }),
+        body: JSON.stringify(chatResponse({ source: "蜂巢", ideas: [{ word: "不足" }] })),
       });
     });
     await generateAttempt(page);
-    await expect(page.locator("main [role=alert]")).toContainText("AI 返回的数据格式不完整，请重试。");
+    await expect(page.locator("main [role=alert]")).toContainText("AI 未能返回 10 个不重复灵感");
+    await expect(page.locator("main [role=alert]")).not.toContainText(BYOK_KEY);
     await expect(page.locator(".bubble-surface")).toHaveCount(0);
-    await page.unroute("**/api/ai/expand");
+    await page.unroute(BYOK_ROUTE);
 
-    await page.route("**/api/ai/expand", async (route) => route.abort("failed"));
+    await page.route(BYOK_ROUTE, async (route) => route.abort("failed"));
     await generateAttempt(page);
-    await expect(page.locator("main [role=alert]")).toContainText("网络连接中断，请检查网络后重试。");
+    await expect(page.locator("main [role=alert]")).toContainText("是否允许浏览器跨域访问");
+    await expect(page.locator("main [role=alert]")).not.toContainText(BYOK_KEY);
     await expect(page.locator(".bubble-surface")).toHaveCount(0);
-    await page.unroute("**/api/ai/expand");
+    await page.unroute(BYOK_ROUTE);
 
+    await page.route(BYOK_ROUTE, async (route) => {
+      const body = JSON.parse(route.request().postData() || "{}") as { model?: string };
+      expect(body.model).toBe("user-expand-model");
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(chatResponse({ source: "蜂巢", ideas: providerIdeas() })),
+      });
+    });
     await generateHoneycomb(page);
-    await expect(page.getByRole("button", { name: "Mock 演示" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /模型设置：OpenAI Compatible/ })).toBeVisible();
   });
 
   test("AI 请求互斥且旧请求不会污染新项目", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "桌面竞态只运行一次");
+    await useBrowserBYOK(page);
     await createProject(page, "旧项目");
     let requestCount = 0;
-    await page.route("**/api/ai/expand", async (route) => {
+    await page.route(BYOK_ROUTE, async (route) => {
       requestCount += 1;
       await new Promise((resolve) => setTimeout(resolve, 650));
-      await route.continue().catch(() => undefined);
+      await route
+        .fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(chatResponse({ source: "蜂巢", ideas: providerIdeas() })),
+        })
+        .catch(() => undefined);
     });
 
     const input = page.getByPlaceholder("输入一个词、一句话，或一段简短说明……").filter({ visible: true });

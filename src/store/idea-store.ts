@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { createProject, DEFAULT_COLLECTION_THRESHOLD, MAX_PROJECT_NODES } from "@/lib/defaults";
 import type {
-  AIProviderId,
+  AIProviderConfig,
   Asset,
   ConceptSummary,
   ExportPreset,
@@ -12,15 +12,19 @@ import type {
   Project,
   ProjectInfo,
   ProjectPlan,
-  ProviderStatus,
   SaveStatus,
   WorkspaceStage,
 } from "@/lib/domain";
+import {
+  clearLocalAIConfig,
+  createDefaultAIConfig,
+  readLocalAIConfig,
+  writeLocalAIConfig,
+} from "@/lib/client-ai-config";
 import { normalizeIdeaWord } from "@/lib/idea-normalization";
 import { projectRepository, readCollectionThreshold, writeCollectionThreshold } from "@/lib/repository";
 
 const HISTORY_LIMIT = 30;
-const PROVIDER_KEY = "idea-bubble:provider";
 const saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const pendingProjects = new Map<string, Project>();
 
@@ -65,8 +69,7 @@ type PlanListField = Extract<
 interface IdeaStore {
   project?: Project;
   selectedNodeId?: string;
-  provider: AIProviderId;
-  providerStatus?: ProviderStatus;
+  aiConfig: AIProviderConfig;
   stage: WorkspaceStage;
   saveStatus: SaveStatus;
   hydrated: boolean;
@@ -80,8 +83,8 @@ interface IdeaStore {
   createNewProject: (info: ProjectInfo) => void;
   loadProject: (project: Project) => void;
   updateProjectInfo: (patch: Partial<ProjectInfo>) => void;
-  setProvider: (provider: AIProviderId) => void;
-  setProviderStatus: (status: ProviderStatus) => void;
+  setAIConfig: (config: AIProviderConfig) => void;
+  clearAIConfig: () => void;
   setStage: (stage: WorkspaceStage) => void;
   setBusyTask: (task?: IdeaStore["busyTask"]) => void;
   setError: (error?: string) => void;
@@ -119,14 +122,6 @@ interface IdeaStore {
   undo: () => void;
   redo: () => void;
   saveNow: () => Promise<void>;
-}
-
-function readProviderPreference(): AIProviderId | undefined {
-  if (typeof window === "undefined") return undefined;
-  const value = window.localStorage.getItem(PROVIDER_KEY);
-  return ["openai", "google", "deepseek", "openai-compatible", "mock"].includes(value || "")
-    ? (value as AIProviderId)
-    : undefined;
 }
 
 async function persistPendingProject(projectId: string, setStatus: (status: SaveStatus) => void) {
@@ -188,7 +183,7 @@ export const useIdeaStore = create<IdeaStore>((set, get) => {
   };
 
   return {
-    provider: "mock",
+    aiConfig: createDefaultAIConfig(),
     stage: "canvas",
     saveStatus: "idle",
     hydrated: false,
@@ -197,6 +192,13 @@ export const useIdeaStore = create<IdeaStore>((set, get) => {
     future: [],
 
     hydrate: async () => {
+      let aiConfig = createDefaultAIConfig();
+      let configError: string | undefined;
+      try {
+        aiConfig = readLocalAIConfig();
+      } catch {
+        configError = "浏览器拒绝读取模型配置，已安全切换到 Mock。";
+      }
       try {
         const project = await projectRepository.getLatest();
         set({
@@ -204,11 +206,12 @@ export const useIdeaStore = create<IdeaStore>((set, get) => {
           hydrated: true,
           saveStatus: project ? "saved" : "idle",
           stage: project?.currentPlan ? "plan" : project?.currentConcept ? "concept" : "canvas",
-          provider: readProviderPreference() || get().provider,
+          aiConfig,
+          error: configError,
           collectionThreshold: readCollectionThreshold(DEFAULT_COLLECTION_THRESHOLD),
         });
       } catch {
-        set({ hydrated: true, saveStatus: "error" });
+        set({ aiConfig, error: configError, hydrated: true, saveStatus: "error" });
       }
     },
 
@@ -235,11 +238,20 @@ export const useIdeaStore = create<IdeaStore>((set, get) => {
       }),
 
     updateProjectInfo: (patch) => mutateProject((project) => Object.assign(project.info, patch)),
-    setProvider: (provider) => {
-      if (typeof window !== "undefined") window.localStorage.setItem(PROVIDER_KEY, provider);
-      set({ provider });
+    setAIConfig: (config) => {
+      try {
+        set({ aiConfig: writeLocalAIConfig(config) });
+      } catch {
+        set({ error: "浏览器拒绝保存模型配置，请检查隐私设置或本地存储空间。" });
+      }
     },
-    setProviderStatus: (providerStatus) => set({ providerStatus }),
+    clearAIConfig: () => {
+      try {
+        set({ aiConfig: clearLocalAIConfig() });
+      } catch {
+        set({ error: "浏览器拒绝清除模型配置，请检查隐私设置后重试。" });
+      }
+    },
     setStage: (stage) => set({ stage }),
     setBusyTask: (busyTask) => set({ busyTask }),
     setError: (error) => set({ error }),

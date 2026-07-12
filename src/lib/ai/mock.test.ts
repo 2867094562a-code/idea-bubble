@@ -4,8 +4,18 @@ import { fixtureProject } from "@/test/fixtures";
 
 describe("Mock AI 闭环", () => {
   it("对蜂巢稳定生成严格 10 个不重复气泡", () => {
-    const first = generateMockExpansion({ source: "蜂巢", existingWords: [], direction: "balanced" });
-    const second = generateMockExpansion({ source: "蜂巢", existingWords: [], direction: "balanced" });
+    const first = generateMockExpansion({
+      source: "蜂巢",
+      existingWords: [],
+      ai: { provider: "mock" },
+      direction: "balanced",
+    });
+    const second = generateMockExpansion({
+      source: "蜂巢",
+      existingWords: [],
+      ai: { provider: "mock" },
+      direction: "balanced",
+    });
     expect(first).toEqual(second);
     expect(first.ideas).toHaveLength(10);
     expect(new Set(first.ideas.map((idea) => idea.word)).size).toBe(10);
@@ -19,6 +29,7 @@ describe("Mock AI 闭环", () => {
     const continued = generateMockExpansion({
       source: "蜂巢",
       existingWords: first.ideas.map((idea) => idea.word),
+      ai: { provider: "mock" },
       direction: "balanced",
     });
     expect(continued.ideas).toHaveLength(10);
@@ -31,14 +42,14 @@ describe("Mock AI 闭环", () => {
     const summary = generateMockSummary({
       projectInfo: project.info,
       collectedIdeas: collected.map(({ id, word, category, reason }) => ({ id, word, category, reason })),
-      provider: "mock",
+      ai: { provider: "mock" },
       tone: "professional",
     });
     const plan = generateMockPlan({
       projectInfo: project.info,
       concept: summary,
       collectedIdeas: collected,
-      provider: "mock",
+      ai: { provider: "mock" },
     });
     expect(summary.sourceNodeIds).toEqual(collected.map((node) => node.id));
     expect(plan.sourceNodeIds).toEqual(collected.map((node) => node.id));

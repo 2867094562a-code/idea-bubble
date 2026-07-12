@@ -1,89 +1,86 @@
-# AI Provider 配置
+# AI Provider 与 BYOK 配置
 
-## 任务模型
+Idea Bubble 不提供共享模型、平台 API Key 或默认真实模型。每位访问者在“模型设置”中填写自己的配置（BYOK，Bring Your Own Key）；未配置时始终使用 Mock。
 
-系统将任务分成五类，模型名全部来自环境变量：
+## 数据流与保存位置
 
-| 任务    | 环境变量           | 用途                     |
-| ------- | ------------------ | ------------------------ |
-| expand  | `AI_MODEL_EXPAND`  | 严格 10 项灵感发散       |
-| summary | `AI_MODEL_SUMMARY` | 收集结果的创意总结       |
-| plan    | `AI_MODEL_PLAN`    | 完整结构化项目计划       |
-| prompt  | `AI_MODEL_PROMPT`  | 中英文生图提示词         |
-| vision  | `AI_MODEL_VISION`  | 图片分析与 10 个视觉气泡 |
+真实 AI 的调用链是：
 
-`AI_PROVIDER` 决定默认 Provider。用户也可以在界面切换 Provider；服务端仍会检查对应凭据和任务模型，不能使用时自动进入 Mock。
-
-## 示例
-
-OpenAI：
-
-```dotenv
-AI_PROVIDER=openai
-OPENAI_API_KEY=...
-AI_MODEL_EXPAND=你的文本模型
-AI_MODEL_SUMMARY=你的文本模型
-AI_MODEL_PLAN=你的文本模型
-AI_MODEL_PROMPT=你的文本模型
-AI_MODEL_VISION=你的视觉模型
+```text
+当前浏览器 localStorage
+  └─ Provider / API Key / Base URL / 每任务模型
+                     ↓ 用户触发生成
+浏览器 ─────────────→ 用户所选 Provider
 ```
 
-Google Gemini：
+- 配置保存在当前浏览器、当前站点 Origin 的 `localStorage`，键名为 `idea-bubble:ai-config:v1`。
+- 配置不是 `Project` 的一部分，不写入项目 IndexedDB、项目备份、报告导出、URL、日志或 Vercel 环境变量。
+- 真实请求由浏览器直接发送给 Provider；Idea Bubble/Vercel API 不接收、代理或保存 API Key。
+- API Key 会在用户执行真实 AI 任务时发送给所选 Provider，这是调用其服务所必需的。Prompt、项目上下文以及主动提交分析的图片也会发送给该 Provider。
+- 更换生产域名、使用 Vercel Preview URL、切换浏览器配置文件或无痕窗口，都会得到独立配置；它们不会自动同步。
 
-```dotenv
-AI_PROVIDER=google
-GOOGLE_GENERATIVE_AI_API_KEY=...
-AI_MODEL_EXPAND=你的 Gemini 模型
-AI_MODEL_SUMMARY=你的 Gemini 模型
-AI_MODEL_PLAN=你的 Gemini 模型
-AI_MODEL_PROMPT=你的 Gemini 模型
-AI_MODEL_VISION=你的多模态 Gemini 模型
-```
+这里特意不使用 Cookie。Cookie 会自动附加到匹配的同源请求，不能满足“配置不上传到 Idea Bubble/Vercel”的约束。
 
-DeepSeek（OpenAI-compatible）：
+## Provider 字段
 
-```dotenv
-AI_PROVIDER=deepseek
-DEEPSEEK_API_KEY=...
-DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
-AI_MODEL_EXPAND=你的 DeepSeek 模型
-AI_MODEL_SUMMARY=你的 DeepSeek 模型
-AI_MODEL_PLAN=你的 DeepSeek 模型
-AI_MODEL_PROMPT=你的 DeepSeek 模型
-```
+支持的 Provider：
 
-自定义 OpenAI-compatible 服务：
+| Provider          | 需要填写                            | 说明                                           |
+| ----------------- | ----------------------------------- | ---------------------------------------------- |
+| Mock              | 无                                  | 本地演示数据，不调用外部模型                   |
+| OpenAI            | API Key、各任务模型                 | 使用 OpenAI 固定接口                           |
+| Google Gemini     | API Key、各任务模型                 | 使用 Google 固定接口                           |
+| DeepSeek          | API Key、各任务模型                 | 使用 DeepSeek 固定接口                         |
+| OpenAI Compatible | HTTPS Base URL、API Key、各任务模型 | 用于支持 OpenAI 协议且允许浏览器跨域调用的服务 |
 
-```dotenv
-AI_PROVIDER=openai-compatible
-CUSTOM_AI_BASE_URL=https://your-provider.example/v1
-CUSTOM_AI_API_KEY=...
-CUSTOM_AI_MODEL=你的默认模型
-# 任何 AI_MODEL_* 都可以覆盖上面的默认模型
-```
+系统不会替用户猜测或写死真实模型名。以下五类任务分别保存模型名称：
 
-不要为不支持图片输入的 Provider 配置 `AI_MODEL_VISION`。图片入口会在失败时展示明确错误，不会假装理解图片。
+| 任务    | 设置项     | 用途                             |
+| ------- | ---------- | -------------------------------- |
+| expand  | 灵感发散   | 严格生成 10 个不重复气泡         |
+| summary | 概念总结   | 收束已收集灵感                   |
+| plan    | 项目计划   | 生成结构化执行计划               |
+| prompt  | 生图提示词 | 生成中英文视觉提示词             |
+| vision  | 图片分析   | 分析静态图片并生成 10 个视觉气泡 |
 
-## 结构化输出与修复
+只需要填写实际使用的任务模型。执行某项任务时若其模型为空，界面会要求补充，不会借用部署方模型，也不会把其他 Provider 的凭据拿来重试。
 
-所有真实模型调用通过 AI SDK 的结构化输出 API，并用 Zod 再校验一次。灵感发散先过滤与已有节点及本批次重复的词；不足 10 项时仅追加一次针对缺口数量的修复请求。修复仍失败会返回 502 和可重试标识。
+## 配置步骤
 
-总结、计划、提示词和图片分析不会盲目重试结构错误，以避免不可控成本。Provider 异常会被转换成安全的中文错误，不把上游响应或密钥暴露给浏览器。
+1. 打开右上角“模型设置”。
+2. 选择 Provider。
+3. 填写自己的 API Key；OpenAI Compatible 还必须填写 HTTPS Base URL。
+4. 为需要的任务填写 Provider 中真实存在的模型名称。
+5. 保存。本次配置只写入当前浏览器。
+6. 发起一个低成本任务验证模型名称、额度和 CORS 是否可用。
 
-## 服务约束
+清除配置会删除本 Origin 下的 BYOK 数据并立即恢复 Mock。删除项目、导入项目备份或切换项目不会修改 BYOK 配置。
 
-```dotenv
-AI_REQUEST_TIMEOUT_MS=30000
-AI_RATE_LIMIT_WINDOW_MS=60000
-AI_RATE_LIMIT_MAX=24
-AI_IDEMPOTENCY_TTL_MS=15000
-```
+## CORS 与浏览器兼容性
 
-这些值在服务端有最小/最大边界。限流与幂等缓存在进程内；横向扩容后应使用共享存储。
+纯浏览器 BYOK 需要 Provider 接口允许当前网页 Origin 跨域请求。若 Provider 不返回合适的 CORS 响应头，浏览器会在请求层阻止调用；这不是 API Key 或模型内容错误。
 
-## 安全提醒
+必须同时满足“Key 不经过 Idea Bubble 云端”和“Provider 禁止浏览器直连”时，两者在纯网页中无法兼得。可选择：
 
-- `.env.local` 不应提交到版本库。
-- 不要把密钥写成 `NEXT_PUBLIC_*`。
-- 自定义 Base URL 只接受 HTTP/HTTPS，但生产环境建议仅允许 HTTPS 并配置域名白名单。
-- 当前应用没有用户认证。部署到公网前，应先加认证与项目级访问控制。
+- 使用明确支持浏览器 CORS 的 Provider/网关；
+- 使用由用户自己控制的 OpenAI-compatible HTTPS 网关并配置 CORS；
+- 继续使用 Mock。
+
+不要为了绕过 CORS 把 Key 改交给公共代理。自定义 Base URL 只接受 HTTPS；使用自建网关意味着该网关能够看到 Key、Prompt 和上传内容，应由用户自行信任和保护。
+
+## 本地密钥风险
+
+客户端可用的 Key 必须能被网页 JavaScript 读取，因此 localStorage 不能提供 HttpOnly Cookie 级别的隔离：
+
+- 同源 XSS、被攻陷的前端依赖或恶意浏览器扩展可能读取 Key；
+- 共用同一浏览器配置文件的人可能使用已保存的 Key；
+- 清除站点数据、无痕窗口结束或浏览器策略可能删除配置；
+- 浏览器本地配置没有账号恢复或跨设备同步。
+
+只使用权限和额度受限、可随时撤销的 Key；不要使用组织管理员 Key。离开共享电脑前点击“清除本地配置”，并在 Provider 控制台撤销不再使用的凭据。界面中的掩码只防止旁观者直接看到，并不等同于加密保险箱。
+
+## 输出与错误边界
+
+所有真实模型输出都要经过结构化 Schema 校验。发散与图片分析必须得到严格 10 个去重结果；格式错误、网络中断、CORS、401/403、额度不足和超时都会显示可重试的安全错误。
+
+错误信息不得回显 API Key、完整 Authorization Header 或上游原始响应。Key 也不得进入请求 URL/query；跨 Provider 切换时必须使用各自保存的配置。

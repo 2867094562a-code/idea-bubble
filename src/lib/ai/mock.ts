@@ -334,6 +334,7 @@ export function generateMockImageAnalysis(input: {
   const expansion = generateMockExpansion({
     source: `图像“${input.name}”`,
     existingWords: [],
+    ai: { provider: "mock" },
     direction: "specific",
   });
   return imageAnalysisResultSchema.parse({

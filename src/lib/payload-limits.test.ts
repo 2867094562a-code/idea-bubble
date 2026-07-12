@@ -32,7 +32,7 @@ describe("Function payload 限制", () => {
       mimeType: "image/png",
       size: MAX_ANALYZABLE_IMAGE_BYTES,
       dataUrl,
-      provider: "mock" as const,
+      ai: { provider: "mock" as const },
     };
 
     expect(analyzeAssetRequestSchema.safeParse(input).success).toBe(true);

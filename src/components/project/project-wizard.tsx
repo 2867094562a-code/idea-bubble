@@ -77,7 +77,7 @@ export function ProjectWizard({
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-xs leading-5 text-slate-400">
                 <Sparkles className="mb-2 size-4 text-[#ffb28b]" />
-                未配置 API Key 时自动进入演示模式，完整流程仍然可用。
+                新用户默认使用 Mock，创建项目后可在模型设置中填写自己的 Key 与模型。
               </div>
             </div>
           </div>

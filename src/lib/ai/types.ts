@@ -1,8 +1,8 @@
 import type { LanguageModel } from "ai";
 
-import type { AIProviderId, InspirationIdea } from "@/lib/domain";
+import type { AIProviderId, AITask, InspirationIdea } from "@/lib/domain";
 
-export type AITask = "expand" | "summary" | "plan" | "prompt" | "vision";
+export type { AITask };
 
 export interface LanguageModelSelection {
   configuredProvider: AIProviderId;

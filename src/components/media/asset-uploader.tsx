@@ -107,7 +107,7 @@ function AssetPreview({ asset }: { asset: Asset }) {
 export function AssetUploader({ className }: AssetUploaderProps) {
   const project = useIdeaStore((state) => state.project);
   const assets = useIdeaStore((state) => state.project?.assets ?? EMPTY_ASSETS);
-  const provider = useIdeaStore((state) => state.provider);
+  const aiConfig = useIdeaStore((state) => state.aiConfig);
   const busyTask = useIdeaStore((state) => state.busyTask);
   const addAsset = useIdeaStore((state) => state.addAsset);
   const updateAsset = useIdeaStore((state) => state.updateAsset);
@@ -221,7 +221,7 @@ export function AssetUploader({ className }: AssetUploaderProps) {
     updateAsset(asset.id, { status: "analyzing" });
 
     try {
-      const result = await analyzeImageAsset(asset, provider, controller.signal);
+      const result = await analyzeImageAsset(asset, aiConfig, controller.signal);
       addExpansion(result.expansion.source, undefined, asset.id, result.expansion.ideas);
       updateAsset(asset.id, {
         status: "analyzed",

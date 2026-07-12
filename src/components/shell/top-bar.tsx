@@ -12,32 +12,15 @@ import {
   Plus,
   Redo2,
   Save,
-  Settings2,
   Sparkles,
   Undo2,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { AI_PROVIDER_LABELS, ProviderDialog } from "@/components/shell/provider-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { AIProviderId, ProviderStatus, SaveStatus, WorkspaceStage } from "@/lib/domain";
+import type { AIProviderConfig, SaveStatus, WorkspaceStage } from "@/lib/domain";
 import { cn } from "@/lib/utils";
-
-const providerLabels: Record<AIProviderId, string> = {
-  mock: "Mock 演示",
-  openai: "OpenAI",
-  google: "Google Gemini",
-  deepseek: "DeepSeek",
-  "openai-compatible": "OpenAI Compatible",
-};
 
 const stages: Array<{ id: WorkspaceStage; label: string; number: string }> = [
   { id: "canvas", label: "发散", number: "01" },
@@ -51,8 +34,7 @@ export function TopBar({
   hasPlan,
   stage,
   saveStatus,
-  provider,
-  providerStatus,
+  aiConfig,
   canUndo,
   canRedo,
   onStageChange,
@@ -62,15 +44,15 @@ export function TopBar({
   onRedo,
   onExport,
   onHistory,
-  onProviderChange,
+  onAIConfigSave,
+  onAIConfigClear,
 }: {
   projectName: string;
   hasConcept: boolean;
   hasPlan: boolean;
   stage: WorkspaceStage;
   saveStatus: SaveStatus;
-  provider: AIProviderId;
-  providerStatus?: ProviderStatus;
+  aiConfig: AIProviderConfig;
   canUndo: boolean;
   canRedo: boolean;
   onStageChange: (stage: WorkspaceStage) => void;
@@ -80,7 +62,8 @@ export function TopBar({
   onRedo: () => void;
   onExport: () => void;
   onHistory: () => void;
-  onProviderChange: (provider: AIProviderId) => void;
+  onAIConfigSave: (config: AIProviderConfig) => void;
+  onAIConfigClear: () => void;
 }) {
   return (
     <header className="relative z-50 flex h-[66px] shrink-0 items-center border-b border-white/[0.08] bg-[#080d16]/95 px-3 backdrop-blur-xl md:px-4">
@@ -137,21 +120,23 @@ export function TopBar({
           <History />
         </IconButton>
 
-        <Dialog>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DialogTrigger asChild>
-                <Button variant="ghost" size="sm" className="ml-1 h-9 gap-2 text-xs text-slate-300">
-                  <Bot className="size-4 text-[#a8ffcb]" />
-                  <span className="hidden xl:inline">{providerLabels[provider]}</span>
-                  {providerStatus?.demoMode && <span className="size-1.5 rounded-full bg-[#ff9d73]" />}
-                </Button>
-              </DialogTrigger>
-            </TooltipTrigger>
-            <TooltipContent>模型设置</TooltipContent>
-          </Tooltip>
-          <ProviderDialog provider={provider} status={providerStatus} onChange={onProviderChange} />
-        </Dialog>
+        <ProviderDialog
+          config={aiConfig}
+          onSave={onAIConfigSave}
+          onClear={onAIConfigClear}
+          trigger={
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-1 h-9 gap-2 text-xs text-slate-300"
+              aria-label={`模型设置：${AI_PROVIDER_LABELS[aiConfig.provider]}`}
+            >
+              <Bot className="size-4 text-[#a8ffcb]" />
+              <span className="hidden xl:inline">{AI_PROVIDER_LABELS[aiConfig.provider]}</span>
+              {aiConfig.provider === "mock" && <span className="size-1.5 rounded-full bg-[#ff9d73]" />}
+            </Button>
+          }
+        />
 
         <Button
           size="sm"
@@ -199,83 +184,5 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
       <Icon className={cn("size-3.5", status === "saving" && "animate-spin")} />
       <span className="hidden md:inline">{view.label}</span>
     </div>
-  );
-}
-
-function ProviderDialog({
-  provider,
-  status,
-  onChange,
-}: {
-  provider: AIProviderId;
-  status?: ProviderStatus;
-  onChange: (provider: AIProviderId) => void;
-}) {
-  const ids = Object.keys(providerLabels) as AIProviderId[];
-  return (
-    <DialogContent className="border-white/10 bg-[#0d1422] text-white sm:max-w-lg">
-      <DialogHeader>
-        <DialogTitle className="flex items-center gap-2">
-          <Settings2 className="size-5 text-[#a8ffcb]" />
-          模型设置
-        </DialogTitle>
-        <DialogDescription>密钥和接口地址只从服务端环境变量读取，不会进入浏览器。</DialogDescription>
-      </DialogHeader>
-      {status?.demoMode && (
-        <div className="rounded-xl border border-[#ff9d73]/25 bg-[#ff9d73]/[0.08] p-3 text-xs leading-5 text-[#ffc3a7]">
-          当前为演示模式。未配置有效密钥时，选择任意供应商也会安全回退到 Mock。
-        </div>
-      )}
-      <div className="grid gap-2">
-        {ids.map((id) => {
-          const available = status?.availableProviders[id] ?? id === "mock";
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => onChange(id)}
-              className={cn(
-                "flex items-center justify-between rounded-xl border p-3 text-left transition-colors",
-                provider === id
-                  ? "border-[#a8ffcb]/45 bg-[#a8ffcb]/[0.07]"
-                  : "border-white/10 bg-white/[0.025] hover:bg-white/[0.05]",
-              )}
-            >
-              <div>
-                <p className="text-sm font-medium">{providerLabels[id]}</p>
-                <p className="mt-1 text-[11px] text-slate-500">
-                  {id === "mock"
-                    ? "稳定演示数据，不消耗 API"
-                    : available
-                      ? "服务端已检测到配置"
-                      : "尚未配置，将回退到 Mock"}
-                </p>
-              </div>
-              <Badge
-                variant="outline"
-                className={
-                  available ? "border-emerald-400/20 text-emerald-300" : "border-white/10 text-slate-500"
-                }
-              >
-                {available ? "可用" : "未配置"}
-              </Badge>
-            </button>
-          );
-        })}
-      </div>
-      {status && (
-        <div className="rounded-xl bg-black/20 p-3">
-          <p className="mb-2 font-mono text-[9px] tracking-wider text-slate-500 uppercase">Task routing</p>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[10px] text-slate-400">
-            {Object.entries(status.taskModels).map(([task, model]) => (
-              <div key={task} className="flex justify-between gap-2">
-                <span>{task}</span>
-                <span className="truncate text-slate-600">{model}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </DialogContent>
   );
 }

@@ -1,5 +1,9 @@
 export type AIProviderId = "openai" | "google" | "deepseek" | "openai-compatible" | "mock";
 
+export type AITask = "expand" | "summary" | "plan" | "prompt" | "vision";
+
+export type AIModelSettings = Record<AITask, string>;
+
 export type ProjectType =
   "鞋类设计" | "产品设计" | "品牌设计" | "平面视觉" | "视频创意" | "通用头脑风暴" | "自定义";
 
@@ -8,8 +12,15 @@ export type AssetStatus = "ready" | "analyzing" | "analyzed" | "unsupported" | "
 
 export interface AIProviderConfig {
   provider: AIProviderId;
-  model: string;
-  apiKey?: string;
+  apiKey: string;
+  baseURL: string;
+  models: AIModelSettings;
+}
+
+/** Only the model needed for the current request is sent to the selected AI provider. */
+export interface AIRequestConfig {
+  provider: AIProviderId;
+  model?: string;
   baseURL?: string;
 }
 
@@ -229,11 +240,3 @@ export interface Project {
 
 export type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
 export type WorkspaceStage = "canvas" | "concept" | "plan";
-
-export interface ProviderStatus {
-  configuredProvider: AIProviderId;
-  activeProvider: AIProviderId;
-  demoMode: boolean;
-  taskModels: Record<"expand" | "summary" | "plan" | "prompt" | "vision", string>;
-  availableProviders: Record<AIProviderId, boolean>;
-}

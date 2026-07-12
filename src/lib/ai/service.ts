@@ -67,7 +67,9 @@ async function generateStructured<T>(options: GenerateOptions<T>): Promise<T> {
     output,
     system: options.system,
     abortSignal: options.signal,
-    maxRetries: 1,
+    // BYOK calls are user-funded. Do not add invisible SDK retries; expansion
+    // keeps its explicit, bounded one-time structured-output repair below.
+    maxRetries: 0,
   } as const;
   const result = options.messages
     ? await generateText({ ...common, messages: options.messages })
@@ -82,8 +84,14 @@ function structuredOutputFailure(error: unknown): boolean {
 
 function providerFailure(error: unknown, signal?: AbortSignal): never {
   if (error instanceof PublicApiError) throw error;
-  if (signal?.aborted || isAbortLikeError(error)) throw error;
-  throw new PublicApiError("AI 服务调用失败，请稍后重试。", 502, true);
+  if (signal?.aborted || isAbortLikeError(error)) {
+    throw new PublicApiError("AI 请求已取消。", 408, true);
+  }
+  throw new PublicApiError(
+    "AI 调用失败，请检查 API Key、模型名称，以及该接口是否允许浏览器跨域访问。",
+    502,
+    true,
+  );
 }
 
 async function repairExpansion(
@@ -116,13 +124,19 @@ async function repairExpansion(
       ideas: combined,
     });
   } catch (error) {
-    if (signal?.aborted || isAbortLikeError(error)) throw error;
+    if (signal?.aborted || isAbortLikeError(error)) {
+      throw new PublicApiError("AI 请求已取消。", 408, true);
+    }
     throw new PublicApiError("AI 未能返回 10 个不重复灵感，请重试或调整输入。", 502, true);
   }
 }
 
-export async function expandInspiration(input: ExpandInput, signal?: AbortSignal): Promise<ExpansionResult> {
-  const selection = getLanguageModel("expand", input.provider);
+export async function expandInspiration(
+  input: ExpandInput,
+  signal?: AbortSignal,
+  apiKey?: string,
+): Promise<ExpansionResult> {
+  const selection = getLanguageModel(input.ai, apiKey);
   if (selection.provider === "mock") return generateMockExpansion(input);
 
   const request = expansionPrompt(input);
@@ -155,8 +169,9 @@ export async function expandInspiration(input: ExpandInput, signal?: AbortSignal
 export async function summarizeCollectedIdeas(
   input: SummarizeInput,
   signal?: AbortSignal,
+  apiKey?: string,
 ): Promise<ConceptSummary> {
-  const selection = getLanguageModel("summary", input.provider);
+  const selection = getLanguageModel(input.ai, apiKey);
   if (selection.provider === "mock") return generateMockSummary(input);
   const request = summaryPrompt(input);
 
@@ -179,8 +194,12 @@ export async function summarizeCollectedIdeas(
   }
 }
 
-export async function generateProjectPlan(input: PlanInput, signal?: AbortSignal): Promise<ProjectPlan> {
-  const selection = getLanguageModel("plan", input.provider);
+export async function generateProjectPlan(
+  input: PlanInput,
+  signal?: AbortSignal,
+  apiKey?: string,
+): Promise<ProjectPlan> {
+  const selection = getLanguageModel(input.ai, apiKey);
   if (selection.provider === "mock") return generateMockPlan(input);
   const request = planPrompt(input);
 
@@ -204,8 +223,12 @@ export async function generateProjectPlan(input: PlanInput, signal?: AbortSignal
   }
 }
 
-export async function generateImagePrompt(input: PromptInput, signal?: AbortSignal): Promise<ImagePrompt> {
-  const selection = getLanguageModel("prompt", input.provider);
+export async function generateImagePrompt(
+  input: PromptInput,
+  signal?: AbortSignal,
+  apiKey?: string,
+): Promise<ImagePrompt> {
+  const selection = getLanguageModel(input.ai, apiKey);
   if (selection.provider === "mock") return generateMockImagePrompt(input);
   const request = imagePromptPrompt(input);
 
@@ -260,8 +283,9 @@ async function realImageAnalysis(
 export async function analyzeImageAsset(
   input: AnalyzeAssetInput,
   signal?: AbortSignal,
+  apiKey?: string,
 ): Promise<ImageAnalysisResult> {
-  const selection = getLanguageModel("vision", input.provider);
+  const selection = getLanguageModel(input.ai, apiKey);
   if (selection.provider === "mock") return generateMockImageAnalysis(input);
 
   try {
@@ -283,7 +307,9 @@ export async function analyzeImageAsset(
       ideas: filterDuplicateIdeas(repaired.ideas, []).slice(0, 10),
     });
   } catch (error) {
-    if (signal?.aborted || isAbortLikeError(error)) throw error;
+    if (signal?.aborted || isAbortLikeError(error)) {
+      throw new PublicApiError("AI 请求已取消。", 408, true);
+    }
     throw new PublicApiError("AI 未能生成有效的图片分析和 10 个灵感，请重试。", 502, true);
   }
 }
