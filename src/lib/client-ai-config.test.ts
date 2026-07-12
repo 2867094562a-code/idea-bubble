@@ -115,5 +115,21 @@ describe("浏览器本地 BYOK 配置", () => {
       ai: { provider: "mimo", model: "mimo-v2.5-pro" },
       apiKey: "mimo-local-key",
     });
+
+    expect(
+      prepareAIRequest(
+        {
+          provider: "mimo",
+          apiKey: "mimo-plan-key",
+          baseURL: "https://token-plan-cn.xiaomimimo.com/v1",
+          models: { expand: "mimo-v2.5-pro", summary: "", plan: "", prompt: "", vision: "" },
+        },
+        "expand",
+      ).ai,
+    ).toEqual({
+      provider: "mimo",
+      model: "mimo-v2.5-pro",
+      baseURL: "https://token-plan-cn.xiaomimimo.com/v1",
+    });
   });
 });

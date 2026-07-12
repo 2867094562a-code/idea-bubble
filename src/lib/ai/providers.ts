@@ -104,7 +104,9 @@ export function getLanguageModel(config: AIRequestConfig, apiKey?: string): Lang
       config.provider === "deepseek"
         ? DEEPSEEK_BASE_URL
         : config.provider === "mimo"
-          ? MIMO_BASE_URL
+          ? config.baseURL
+            ? compatibleBaseURLOrThrow(config.baseURL)
+            : MIMO_BASE_URL
           : config.provider === "openai-compatible"
             ? compatibleBaseURLOrThrow(config.baseURL)
             : undefined;

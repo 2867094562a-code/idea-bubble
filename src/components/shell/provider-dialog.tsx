@@ -89,6 +89,7 @@ export function ProviderDialog({ config, trigger, onSave, onClear }: ProviderDia
 
   const configured = configuredTaskCount(normalizeAIConfig(draft));
   const compatibleNeedsURL = draft.provider === "openai-compatible";
+  const mimoSupportsCustomURL = draft.provider === "mimo";
   const canSave =
     draft.provider === "mock" ||
     (Boolean(draft.apiKey.trim()) && (!compatibleNeedsURL || isValidHttpsBaseURL(draft.baseURL.trim())));
@@ -204,13 +205,24 @@ export function ProviderDialog({ config, trigger, onSave, onClear }: ProviderDia
               </div>
             ) : null}
 
-            {draft.provider === "mimo" ? (
-              <p className="rounded-lg border border-[#a8ffcb]/15 bg-[#a8ffcb]/[0.04] px-3 py-2 text-[11px] leading-4 text-slate-400">
-                使用 MiMo 官方 OpenAI 兼容接口 <code>https://api.xiaomimimo.com/v1/chat/completions</code>
-                ，认证请求头为
-                <code>api-key</code>。按量 Key 通常以 <code>sk-</code> 开头；Token Plan
-                请在小米控制台获取专属地址后使用 OpenAI Compatible。
-              </p>
+            {mimoSupportsCustomURL ? (
+              <div className="space-y-2">
+                <Label htmlFor="mimo-base-url">MiMo Base URL（可选）</Label>
+                <Input
+                  id="mimo-base-url"
+                  type="url"
+                  inputMode="url"
+                  value={draft.baseURL}
+                  onChange={(event) => setDraft((current) => ({ ...current, baseURL: event.target.value }))}
+                  placeholder="https://token-plan-cn.xiaomimimo.com/v1"
+                  spellCheck={false}
+                  maxLength={500}
+                />
+                <p className="text-[11px] leading-4 text-slate-500">
+                  留空时使用按量 API 的官方地址 <code>https://api.xiaomimimo.com/v1</code>。Token Plan
+                  请填写小米控制台提供的专属 HTTPS 地址；两种方式都会使用 <code>api-key</code> 认证。
+                </p>
+              </div>
             ) : null}
 
             <div className="space-y-3">

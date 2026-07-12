@@ -108,7 +108,10 @@ export function prepareAIRequest(
     throw new ApiError(`请先在模型设置中填写“${AI_TASK_LABELS[task]}”使用的模型名称。`, 400, false);
   }
 
-  if (normalized.provider === "openai-compatible" && !validPublicBaseURL(normalized.baseURL)) {
+  if (
+    (normalized.provider === "openai-compatible" && !validPublicBaseURL(normalized.baseURL)) ||
+    (normalized.provider === "mimo" && normalized.baseURL && !validPublicBaseURL(normalized.baseURL))
+  ) {
     throw new ApiError("OpenAI Compatible 需要填写有效的 HTTPS Base URL。", 400, false);
   }
 
@@ -116,7 +119,10 @@ export function prepareAIRequest(
     ai: {
       provider: normalized.provider,
       model,
-      ...(normalized.provider === "openai-compatible" ? { baseURL: normalized.baseURL } : {}),
+      ...(normalized.provider === "openai-compatible" ||
+      (normalized.provider === "mimo" && normalized.baseURL)
+        ? { baseURL: normalized.baseURL }
+        : {}),
     },
     apiKey: normalized.apiKey,
   };

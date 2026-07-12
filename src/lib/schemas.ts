@@ -30,7 +30,13 @@ export const aiRequestConfigSchema: z.ZodType<AIRequestConfig> = z.discriminated
   z.object({ provider: z.literal("openai"), model: aiModelSchema }).strict(),
   z.object({ provider: z.literal("google"), model: aiModelSchema }).strict(),
   z.object({ provider: z.literal("deepseek"), model: aiModelSchema }).strict(),
-  z.object({ provider: z.literal("mimo"), model: aiModelSchema }).strict(),
+  z
+    .object({
+      provider: z.literal("mimo"),
+      model: aiModelSchema,
+      baseURL: compatibleBaseURLSchema.optional(),
+    })
+    .strict(),
   z
     .object({
       provider: z.literal("openai-compatible"),
