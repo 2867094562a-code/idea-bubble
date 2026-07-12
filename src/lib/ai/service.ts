@@ -9,6 +9,7 @@ import {
   generateMockSummary,
 } from "@/lib/ai/mock";
 import { getLanguageModel } from "@/lib/ai/providers";
+import { createImageJsonPrompt } from "@/lib/image-prompt-format";
 import {
   expansionPrompt,
   expansionRepairPrompt,
@@ -311,11 +312,25 @@ export async function generateImagePrompt(
       prompt: request.prompt,
       signal,
     });
-    return imagePromptSchema.parse({
+    const background = {
+      white: "纯白无缝背景，地面仅保留浅柔影。",
+      studio: "有层次的专业影棚背景，避免分散主体注意力。",
+      scene: "与项目用途匹配的具体环境背景，保持主体清晰。",
+    }[input.backgroundChoice];
+    const modelDirection =
+      input.modelChoice === "required"
+        ? "需要人物模特，呈现与目标用户相符的自然使用姿态和服装。"
+        : "不需要人物模特，画面中不得出现人物。";
+    const prompt = {
       ...generated,
+      promptCN: `${generated.promptCN} 背景：${background} 人物模特：${modelDirection}`,
+      promptEN: `${generated.promptEN} Background: ${background} Model direction: ${modelDirection}`,
+      background,
+      modelDirection,
       sourceIdeas: input.plan.coreIdeas,
       sourceNodeIds: input.plan.sourceNodeIds,
-    });
+    };
+    return imagePromptSchema.parse({ ...prompt, jsonPrompt: createImageJsonPrompt(prompt) });
   } catch (error) {
     providerFailure(error, signal, selection);
   }

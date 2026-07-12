@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { BookmarkPlus, CheckCircle2, Copy, Download, ImagePlus, LoaderCircle, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,8 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { Project, ProjectPlan } from "@/lib/domain";
+import type { ImageBackgroundChoice, ImageModelChoice, Project, ProjectPlan } from "@/lib/domain";
+import { createImageJsonPrompt } from "@/lib/image-prompt-format";
 import { useIdeaStore } from "@/store/idea-store";
 
 const textSections: Array<{
@@ -60,7 +63,10 @@ export function PlanEditor({
 }: {
   project: Project;
   onExport: () => void;
-  onGeneratePrompt: () => void;
+  onGeneratePrompt: (options: {
+    backgroundChoice: ImageBackgroundChoice;
+    modelChoice: ImageModelChoice;
+  }) => void;
 }) {
   const plan = project.currentPlan;
   const updatePlanText = useIdeaStore((state) => state.updatePlanText);
@@ -71,6 +77,8 @@ export function PlanEditor({
   const markFinalPlanVersion = useIdeaStore((state) => state.markFinalPlanVersion);
   const busyTask = useIdeaStore((state) => state.busyTask);
   const prompt = project.imagePromptVersions[0];
+  const [backgroundChoice, setBackgroundChoice] = useState<ImageBackgroundChoice>("white");
+  const [modelChoice, setModelChoice] = useState<ImageModelChoice>("none");
   if (!plan) return null;
 
   return (
@@ -84,11 +92,38 @@ export function PlanEditor({
           <h2 className="mt-2 text-xl font-semibold tracking-tight text-white">{plan.projectName}</h2>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Select
+            value={backgroundChoice}
+            onValueChange={(value) => setBackgroundChoice(value as ImageBackgroundChoice)}
+          >
+            <SelectTrigger className="h-8 w-[132px] text-xs">
+              <SelectValue placeholder="背景" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="white">纯白背景</SelectItem>
+              <SelectItem value="studio">影棚背景</SelectItem>
+              <SelectItem value="scene">场景背景</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={modelChoice} onValueChange={(value) => setModelChoice(value as ImageModelChoice)}>
+            <SelectTrigger className="h-8 w-[122px] text-xs">
+              <SelectValue placeholder="人物模特" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">不需要模特</SelectItem>
+              <SelectItem value="required">需要模特</SelectItem>
+            </SelectContent>
+          </Select>
           <Button variant="outline" size="sm" onClick={() => savePlanVersion()}>
             <BookmarkPlus className="size-4" />
             保存版本
           </Button>
-          <Button variant="outline" size="sm" disabled={Boolean(busyTask)} onClick={onGeneratePrompt}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={Boolean(busyTask)}
+            onClick={() => onGeneratePrompt({ backgroundChoice, modelChoice })}
+          >
             {busyTask === "prompt" ? (
               <LoaderCircle className="size-4 animate-spin" />
             ) : (
@@ -237,6 +272,23 @@ export function PlanEditor({
                 <div>
                   <Label className="mb-2 block text-xs">English</Label>
                   <Textarea value={prompt.data.promptEN} readOnly rows={8} />
+                </div>
+                <div className="lg:col-span-2">
+                  <Label className="mb-2 block text-xs">JSON 提示词</Label>
+                  <Textarea
+                    value={prompt.data.jsonPrompt ?? createImageJsonPrompt(prompt.data)}
+                    readOnly
+                    rows={12}
+                    className="font-mono text-xs"
+                  />
+                </div>
+                <div>
+                  <Label className="mb-2 block text-xs">背景方案</Label>
+                  <Textarea value={prompt.data.background} readOnly rows={3} />
+                </div>
+                <div>
+                  <Label className="mb-2 block text-xs">人物模特</Label>
+                  <Textarea value={prompt.data.modelDirection} readOnly rows={3} />
                 </div>
               </CardContent>
             </Card>

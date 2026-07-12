@@ -8,6 +8,7 @@ import type {
   ProjectPlan,
   ProjectPlanVersion,
 } from "@/lib/domain";
+import { createImageJsonPrompt } from "@/lib/image-prompt-format";
 
 import type { ExportAsset, ExportBlock, ExportDocument, ExportIdea, ExportSection } from "./types";
 
@@ -279,12 +280,15 @@ function imagePromptSection(prompt: ImagePrompt | undefined): ExportSection | un
   const blocks = compactBlocks([
     paragraph("中文提示词", prompt.promptCN),
     paragraph("English Prompt", prompt.promptEN),
+    paragraph("JSON Prompt", prompt.jsonPrompt ?? createImageJsonPrompt(prompt)),
     keyValues("画面设置", [
       { label: "主体", value: prompt.subject },
       { label: "风格", value: prompt.style },
       { label: "构图", value: prompt.composition },
       { label: "光线", value: prompt.lighting },
       { label: "镜头", value: prompt.camera },
+      { label: "背景", value: prompt.background },
+      { label: "人物模特", value: prompt.modelDirection },
     ]),
     list("材质", prompt.materials),
     list("配色", prompt.colorPalette),

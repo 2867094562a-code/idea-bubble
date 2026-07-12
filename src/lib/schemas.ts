@@ -113,9 +113,12 @@ export const projectPlanSchema = z.object({
 export const imagePromptSchema = z.object({
   promptCN: z.string().trim().min(1),
   promptEN: z.string().trim().min(1),
+  jsonPrompt: z.string().trim().min(2).optional(),
   subject: z.string(),
   style: z.string(),
   composition: z.string(),
+  background: z.string().trim().min(1).default("未指定背景"),
+  modelDirection: z.string().trim().min(1).default("未指定是否需要人物模特"),
   materials: z.array(z.string()),
   colorPalette: z.array(z.string()),
   lighting: z.string(),
@@ -176,6 +179,8 @@ export const promptRequestSchema = z.object({
   projectInfo: projectInfoSchema,
   plan: projectPlanSchema,
   ai: aiRequestConfigSchema,
+  backgroundChoice: z.enum(["white", "studio", "scene"]).default("white"),
+  modelChoice: z.enum(["none", "required"]).default("none"),
 });
 
 export const analyzeAssetRequestSchema = z.object({

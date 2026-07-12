@@ -1,6 +1,8 @@
 export type AIProviderId = "openai" | "google" | "deepseek" | "mimo" | "openai-compatible" | "mock";
 
 export type AITask = "expand" | "summary" | "plan" | "prompt" | "vision";
+export type ImageBackgroundChoice = "white" | "studio" | "scene";
+export type ImageModelChoice = "none" | "required";
 
 export type AIModelSettings = Record<AITask, string>;
 
@@ -131,9 +133,12 @@ export interface ProjectPlanVersion {
 export interface ImagePrompt {
   promptCN: string;
   promptEN: string;
+  jsonPrompt?: string;
   subject: string;
   style: string;
   composition: string;
+  background: string;
+  modelDirection: string;
   materials: string[];
   colorPalette: string[];
   lighting: string;

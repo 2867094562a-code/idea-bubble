@@ -18,7 +18,13 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import { prepareAIRequest } from "@/lib/client-ai-config";
 import { MAX_PROJECT_NODES } from "@/lib/defaults";
-import type { AIProviderConfig, ProjectInfo, WorkspaceStage } from "@/lib/domain";
+import type {
+  AIProviderConfig,
+  ImageBackgroundChoice,
+  ImageModelChoice,
+  ProjectInfo,
+  WorkspaceStage,
+} from "@/lib/domain";
 import { parseApiData } from "@/lib/api-client";
 import {
   conceptSummarySchema,
@@ -255,35 +261,39 @@ export function IdeaBubbleApp() {
     }
   }, [aiConfig, beginRequest, finishRequest, requestIsCurrent, setError, setPlan, setStage]);
 
-  const generatePrompt = useCallback(async () => {
-    const current = useIdeaStore.getState().project;
-    if (!current?.currentPlan) return;
-    const request = beginRequest("prompt", current.id);
-    if (!request) return;
-    try {
-      const { ai, apiKey } = prepareAIRequest(aiConfig, "prompt");
-      const { generateImagePrompt } = await import("@/lib/ai/service");
-      const data = parseApiData(
-        imagePromptSchema,
-        await generateImagePrompt(
-          {
-            projectInfo: current.info,
-            plan: current.currentPlan,
-            ai,
-          },
-          request.controller.signal,
-          apiKey,
-        ),
-      );
-      if (!requestIsCurrent(request)) return;
-      saveImagePrompt(data);
-    } catch (cause) {
-      if (!requestIsCurrent(request)) return;
-      setError(cause instanceof Error ? cause.message : "提示词生成失败，请重试。");
-    } finally {
-      finishRequest(request);
-    }
-  }, [aiConfig, beginRequest, finishRequest, requestIsCurrent, saveImagePrompt, setError]);
+  const generatePrompt = useCallback(
+    async (options: { backgroundChoice: ImageBackgroundChoice; modelChoice: ImageModelChoice }) => {
+      const current = useIdeaStore.getState().project;
+      if (!current?.currentPlan) return;
+      const request = beginRequest("prompt", current.id);
+      if (!request) return;
+      try {
+        const { ai, apiKey } = prepareAIRequest(aiConfig, "prompt");
+        const { generateImagePrompt } = await import("@/lib/ai/service");
+        const data = parseApiData(
+          imagePromptSchema,
+          await generateImagePrompt(
+            {
+              projectInfo: current.info,
+              plan: current.currentPlan,
+              ai,
+              ...options,
+            },
+            request.controller.signal,
+            apiKey,
+          ),
+        );
+        if (!requestIsCurrent(request)) return;
+        saveImagePrompt(data);
+      } catch (cause) {
+        if (!requestIsCurrent(request)) return;
+        setError(cause instanceof Error ? cause.message : "提示词生成失败，请重试。");
+      } finally {
+        finishRequest(request);
+      }
+    },
+    [aiConfig, beginRequest, finishRequest, requestIsCurrent, saveImagePrompt, setError],
+  );
 
   const createProject = useCallback(
     (info: ProjectInfo) => {
@@ -354,7 +364,7 @@ export function IdeaBubbleApp() {
               <PlanEditor
                 project={project}
                 onExport={() => setExportOpen(true)}
-                onGeneratePrompt={() => void generatePrompt()}
+                onGeneratePrompt={(options) => void generatePrompt(options)}
               />
             )}
             <div className="absolute top-3 left-3 z-30 flex gap-2 lg:hidden">

@@ -3,6 +3,7 @@ import type { z } from "zod";
 import type { ImageAnalysisResult, AITask } from "@/lib/ai/types";
 import type { ConceptSummary, ImagePrompt, InspirationIdea, ProjectPlan } from "@/lib/domain";
 import { normalizeIdeaWord } from "@/lib/idea-normalization";
+import { createImageJsonPrompt } from "@/lib/image-prompt-format";
 import {
   conceptSummarySchema,
   expansionResultSchema,
@@ -309,13 +310,24 @@ export function generateMockImagePrompt(input: PromptInput): ImagePrompt {
   const ideas = input.plan.coreIdeas.slice(0, 8);
   const subject = input.plan.projectName;
   const forbidden = input.projectInfo.forbiddenElements.trim();
+  const background = {
+    white: "纯白无缝影棚背景，地面保留极浅柔影，突出产品轮廓与材质。",
+    studio: "低饱和渐变影棚背景，以柔和布光和层次感衬托主体。",
+    scene: "与项目使用场景一致的真实环境背景，保持主体清晰且不喧宾夺主。",
+  }[input.backgroundChoice];
+  const modelDirection =
+    input.modelChoice === "required"
+      ? "需要一位与目标用户相符的人物模特，以自然站姿或使用姿态呈现产品尺度和交互。"
+      : "无需人物模特；以单一产品主体和尺度参照呈现。";
 
-  return imagePromptSchema.parse({
-    promptCN: `${subject}概念设计，以${ideas.join("、")}为核心，圆润克制的未来形态，模块化结构，细腻雾面与半透明材质，清晰层级，真实产品摄影质感，柔和侧光，高细节。`,
-    promptEN: `${subject} concept design, inspired by ${ideas.join(", ")}, restrained rounded futuristic form, modular structure, refined matte and translucent materials, clear visual hierarchy, realistic product photography, soft side lighting, high detail.`,
+  const prompt = {
+    promptCN: `${subject}概念设计，以${ideas.join("、")}为核心，圆润克制的未来形态，模块化结构，细腻雾面与半透明材质，清晰层级，真实产品摄影质感，柔和侧光，高细节。背景：${background} 人物模特：${modelDirection}`,
+    promptEN: `${subject} concept design, inspired by ${ideas.join(", ")}, restrained rounded futuristic form, modular structure, refined matte and translucent materials, clear visual hierarchy, realistic product photography, soft side lighting, high detail. Background: ${background} Model direction: ${modelDirection}`,
     subject,
     style: "克制的未来主义产品设计",
     composition: "主体居中偏下，三分之二视角，留出充足负空间",
+    background,
+    modelDirection,
     materials: input.plan.materialsOrResources.slice(0, 6),
     colorPalette: input.plan.colorDirection.slice(0, 6),
     lighting: "柔和大面积侧光，边缘有轻微轮廓光",
@@ -323,7 +335,8 @@ export function generateMockImagePrompt(input: PromptInput): ImagePrompt {
     negativePrompt: ["低清晰度", "过度装饰", "文字水印", "比例错误", ...(forbidden ? [forbidden] : [])],
     sourceIdeas: ideas,
     sourceNodeIds: input.plan.sourceNodeIds,
-  });
+  };
+  return imagePromptSchema.parse({ ...prompt, jsonPrompt: createImageJsonPrompt(prompt) });
 }
 
 export function generateMockImageAnalysis(input: {
