@@ -50,6 +50,16 @@ function request() {
   };
 }
 
+function mimoRequest() {
+  return {
+    ...request(),
+    ai: {
+      provider: "mimo" as const,
+      model: "mimo-v2.5-pro",
+    },
+  };
+}
+
 describe("浏览器直连 BYOK", () => {
   afterEach(() => vi.restoreAllMocks());
 
@@ -73,6 +83,31 @@ describe("浏览器直连 BYOK", () => {
     });
     expect(JSON.parse(String(init?.body))).toMatchObject({ model: "user-model" });
     expect(String(url)).not.toContain(SENTINEL_KEY);
+    expect(String(init?.body)).not.toContain(SENTINEL_KEY);
+  });
+
+  it("MiMo uses its documented endpoint and api-key authentication", async () => {
+    const completion = chatCompletion();
+    const payload = await completion.json();
+    payload.choices[0].message.content = `<think>internal reasoning</think>\n\`\`\`json\n${JSON.stringify({ source: "蜂巢", ideas: ideas() })}\n\`\`\``;
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    const result = await expandInspiration(mimoRequest(), undefined, SENTINEL_KEY);
+
+    expect(result.ideas).toHaveLength(10);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toBe("https://api.xiaomimimo.com/v1/chat/completions");
+    const headers = new Headers(init?.headers);
+    expect(headers.get("api-key")).toBe(SENTINEL_KEY);
+    expect(headers.has("authorization")).toBe(false);
+    const body = JSON.parse(String(init?.body));
+    expect(body).toMatchObject({ model: "mimo-v2.5-pro" });
+    expect(body.response_format).toBeUndefined();
     expect(String(init?.body)).not.toContain(SENTINEL_KEY);
   });
 

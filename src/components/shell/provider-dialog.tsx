@@ -30,6 +30,7 @@ export const AI_PROVIDER_LABELS: Record<AIProviderId, string> = {
   openai: "OpenAI",
   google: "Google Gemini",
   deepseek: "DeepSeek",
+  mimo: "Xiaomi MiMo",
   "openai-compatible": "OpenAI Compatible",
 };
 
@@ -39,13 +40,7 @@ const TASK_IDS = Object.keys(AI_TASK_LABELS) as AITask[];
 function isValidHttpsBaseURL(value: string): boolean {
   try {
     const url = new URL(value);
-    return (
-      url.protocol === "https:" &&
-      !url.username &&
-      !url.password &&
-      !url.search &&
-      !url.hash
-    );
+    return url.protocol === "https:" && !url.username && !url.password && !url.search && !url.hash;
   } catch {
     return false;
   }
@@ -207,6 +202,15 @@ export function ProviderDialog({ config, trigger, onSave, onClear }: ProviderDia
                   密钥会直接发送到这个地址。请只填写你信任且允许浏览器跨域访问的 HTTPS 服务。
                 </p>
               </div>
+            ) : null}
+
+            {draft.provider === "mimo" ? (
+              <p className="rounded-lg border border-[#a8ffcb]/15 bg-[#a8ffcb]/[0.04] px-3 py-2 text-[11px] leading-4 text-slate-400">
+                使用 MiMo 官方 OpenAI 兼容接口 <code>https://api.xiaomimimo.com/v1/chat/completions</code>
+                ，认证请求头为
+                <code>api-key</code>。按量 Key 通常以 <code>sk-</code> 开头；Token Plan
+                请在小米控制台获取专属地址后使用 OpenAI Compatible。
+              </p>
             ) : null}
 
             <div className="space-y-3">

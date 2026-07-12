@@ -1,4 +1,4 @@
-export type AIProviderId = "openai" | "google" | "deepseek" | "openai-compatible" | "mock";
+export type AIProviderId = "openai" | "google" | "deepseek" | "mimo" | "openai-compatible" | "mock";
 
 export type AITask = "expand" | "summary" | "plan" | "prompt" | "vision";
 

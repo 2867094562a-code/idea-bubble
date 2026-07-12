@@ -52,9 +52,63 @@ interface GenerateOptions<T> {
   messages?: Parameters<typeof generateText>[0]["messages"];
 }
 
+const MIMO_JSON_SYSTEM_SUFFIX = [
+  "你正在调用 Xiaomi MiMo 的 Chat Completions 接口。",
+  "请只返回一个可被 JSON.parse 解析的完整 JSON 对象。",
+  "不要输出 Markdown 代码块、解释、前缀、后缀或 reasoning_content。",
+].join("\n");
+
+function extractJsonObject(text: string): string {
+  const trimmed = text
+    .trim()
+    .replace(/^```(?:json)?\s*/iu, "")
+    .replace(/\s*```$/u, "")
+    .trim();
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) return trimmed;
+
+  let start = -1;
+  let depth = 0;
+  let quoted = false;
+  let escaped = false;
+  for (let index = 0; index < trimmed.length; index += 1) {
+    const character = trimmed[index];
+    if (quoted) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') quoted = false;
+      continue;
+    }
+    if (character === '"') {
+      quoted = true;
+      continue;
+    }
+    if (character === "{") {
+      if (start < 0) start = index;
+      depth += 1;
+    } else if (character === "}" && start >= 0) {
+      depth -= 1;
+      if (depth === 0) return trimmed.slice(start, index + 1);
+    }
+  }
+  throw new z.ZodError([]);
+}
+
 async function generateStructured<T>(options: GenerateOptions<T>): Promise<T> {
   if (!options.selection.model) {
     throw new PublicApiError("当前任务未配置可用模型。", 503, false);
+  }
+
+  if (options.selection.provider === "mimo") {
+    const common = {
+      model: options.selection.model,
+      system: `${options.system}\n${MIMO_JSON_SYSTEM_SUFFIX}`,
+      abortSignal: options.signal,
+      maxRetries: 0,
+    } as const;
+    const result = options.messages
+      ? await generateText({ ...common, messages: options.messages })
+      : await generateText({ ...common, prompt: options.prompt ?? "" });
+    return options.schema.parse(JSON.parse(extractJsonObject(result.text)));
   }
 
   const output = Output.object({

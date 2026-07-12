@@ -11,7 +11,14 @@ export const AI_TASK_LABELS: Record<AITask, string> = {
   vision: "图片分析",
 };
 
-const PROVIDERS = new Set<AIProviderId>(["openai", "google", "deepseek", "openai-compatible", "mock"]);
+const PROVIDERS = new Set<AIProviderId>([
+  "openai",
+  "google",
+  "deepseek",
+  "mimo",
+  "openai-compatible",
+  "mock",
+]);
 
 function clean(value: unknown, maximum: number): string {
   return typeof value === "string" ? value.trim().slice(0, maximum) : "";
@@ -79,13 +86,7 @@ export function clearLocalAIConfig(): AIProviderConfig {
 function validPublicBaseURL(value: string): boolean {
   try {
     const url = new URL(value);
-    return (
-      url.protocol === "https:" &&
-      !url.username &&
-      !url.password &&
-      !url.search &&
-      !url.hash
-    );
+    return url.protocol === "https:" && !url.username && !url.password && !url.search && !url.hash;
   } catch {
     return false;
   }

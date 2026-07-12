@@ -99,4 +99,21 @@ describe("浏览器本地 BYOK 配置", () => {
       baseURL: "https://example.com/v1",
     });
   });
+
+  it("MiMo is a dedicated provider and does not require a user Base URL", () => {
+    const request = prepareAIRequest(
+      {
+        provider: "mimo",
+        apiKey: "mimo-local-key",
+        baseURL: "",
+        models: { expand: "mimo-v2.5-pro", summary: "", plan: "", prompt: "", vision: "" },
+      },
+      "expand",
+    );
+
+    expect(request).toEqual({
+      ai: { provider: "mimo", model: "mimo-v2.5-pro" },
+      apiKey: "mimo-local-key",
+    });
+  });
 });

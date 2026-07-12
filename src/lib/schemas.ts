@@ -3,7 +3,7 @@ import type { AIRequestConfig } from "@/lib/domain";
 import { normalizeIdeaWord } from "@/lib/idea-normalization";
 import { MAX_ANALYZABLE_IMAGE_BYTES, MAX_INLINE_DATA_URL_CHARS } from "@/lib/payload-limits";
 
-export const providerIdSchema = z.enum(["openai", "google", "deepseek", "openai-compatible", "mock"]);
+export const providerIdSchema = z.enum(["openai", "google", "deepseek", "mimo", "openai-compatible", "mock"]);
 
 const aiModelSchema = z.string().trim().min(1).max(200);
 
@@ -15,13 +15,7 @@ const compatibleBaseURLSchema = z
   .refine((value) => {
     try {
       const url = new URL(value);
-      return (
-        url.protocol === "https:" &&
-        !url.username &&
-        !url.password &&
-        !url.search &&
-        !url.hash
-      );
+      return url.protocol === "https:" && !url.username && !url.password && !url.search && !url.hash;
     } catch {
       return false;
     }
@@ -36,6 +30,7 @@ export const aiRequestConfigSchema: z.ZodType<AIRequestConfig> = z.discriminated
   z.object({ provider: z.literal("openai"), model: aiModelSchema }).strict(),
   z.object({ provider: z.literal("google"), model: aiModelSchema }).strict(),
   z.object({ provider: z.literal("deepseek"), model: aiModelSchema }).strict(),
+  z.object({ provider: z.literal("mimo"), model: aiModelSchema }).strict(),
   z
     .object({
       provider: z.literal("openai-compatible"),

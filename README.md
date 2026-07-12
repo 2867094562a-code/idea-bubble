@@ -54,7 +54,7 @@ npm run start
 | `prompt`  | 生图提示词 |
 | `vision`  | 图片分析   |
 
-支持 OpenAI、Google Gemini、DeepSeek、OpenAI-compatible 和 Mock。缺少当前任务的 Key、模型或有效 Base URL 时，应用会要求补全配置，不会借用部署方凭据或默认模型。
+支持 OpenAI、Google Gemini、DeepSeek、Xiaomi MiMo、OpenAI-compatible 和 Mock。MiMo 使用官方固定 OpenAI 兼容端点与 `api-key` 请求头；缺少当前任务的 Key、模型或有效 Base URL 时，应用会要求补全配置，不会借用部署方凭据或默认模型。
 
 ### 配置边界
 

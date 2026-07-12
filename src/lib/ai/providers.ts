@@ -6,6 +6,7 @@ import type { LanguageModelSelection } from "@/lib/ai/types";
 import { PublicApiError } from "@/lib/server/errors";
 
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1";
+const MIMO_BASE_URL = "https://api.xiaomimimo.com/v1";
 
 /**
  * Prevent browser credentials, referrers, caches, and redirects from leaking a
@@ -20,6 +21,20 @@ const privateProviderFetch: typeof fetch = (input, init) =>
     referrerPolicy: "no-referrer",
     redirect: "error",
   });
+
+/**
+ * MiMo's OpenAI-compatible endpoint uses the non-standard `api-key` header,
+ * as documented in its official curl example. Rewrite the SDK's default
+ * Bearer header immediately before the browser request is sent.
+ */
+function mimoProviderFetch(apiKey: string): typeof fetch {
+  return (input, init) => {
+    const headers = new Headers(init?.headers);
+    headers.delete("authorization");
+    headers.set("api-key", apiKey);
+    return privateProviderFetch(input, { ...init, headers });
+  };
+}
 
 function apiKeyOrThrow(apiKey: string | undefined): string {
   const normalized = apiKey?.trim();
@@ -46,13 +61,7 @@ function modelOrThrow(config: AIRequestConfig): string {
 function compatibleBaseURLOrThrow(value: string | undefined): string {
   try {
     const url = new URL(value ?? "");
-    if (
-      url.protocol !== "https:" ||
-      url.username ||
-      url.password ||
-      url.search ||
-      url.hash
-    ) {
+    if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) {
       throw new Error("invalid URL");
     }
     return url.toString().replace(/\/$/u, "");
@@ -94,14 +103,16 @@ export function getLanguageModel(config: AIRequestConfig, apiKey?: string): Lang
     const baseURL =
       config.provider === "deepseek"
         ? DEEPSEEK_BASE_URL
-        : config.provider === "openai-compatible"
-          ? compatibleBaseURLOrThrow(config.baseURL)
-          : undefined;
+        : config.provider === "mimo"
+          ? MIMO_BASE_URL
+          : config.provider === "openai-compatible"
+            ? compatibleBaseURLOrThrow(config.baseURL)
+            : undefined;
     const provider = createOpenAI({
       apiKey: key,
       ...(baseURL ? { baseURL } : {}),
       ...(config.provider !== "openai" ? { name: config.provider } : {}),
-      fetch: privateProviderFetch,
+      fetch: config.provider === "mimo" ? mimoProviderFetch(key) : privateProviderFetch,
     });
 
     return {
@@ -109,7 +120,9 @@ export function getLanguageModel(config: AIRequestConfig, apiKey?: string): Lang
       provider: config.provider,
       modelName,
       model:
-        config.provider === "deepseek" || config.provider === "openai-compatible"
+        config.provider === "deepseek" ||
+        config.provider === "mimo" ||
+        config.provider === "openai-compatible"
           ? provider.chat(modelName)
           : provider(modelName),
       demoMode: false,
