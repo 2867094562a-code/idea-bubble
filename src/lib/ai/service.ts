@@ -1,4 +1,4 @@
-import { generateText, NoObjectGeneratedError, Output } from "ai";
+import { APICallError, generateText, NoObjectGeneratedError, Output } from "ai";
 import { z } from "zod";
 
 import {
@@ -137,10 +137,24 @@ function structuredOutputFailure(error: unknown): boolean {
   return NoObjectGeneratedError.isInstance(error) || error instanceof z.ZodError;
 }
 
-function providerFailure(error: unknown, signal?: AbortSignal): never {
+function providerFailure(error: unknown, signal?: AbortSignal, selection?: LanguageModelSelection): never {
   if (error instanceof PublicApiError) throw error;
   if (signal?.aborted || isAbortLikeError(error)) {
     throw new PublicApiError("AI 请求已取消。", 408, true);
+  }
+  if (selection?.provider === "mimo" && APICallError.isInstance(error) && error.statusCode) {
+    const messageByStatus: Record<number, string> = {
+      400: "MiMo 拒绝了请求参数，请确认模型名称和任务配置。",
+      401: "MiMo 未接受该 API Key，请确认 Key 类型、有效期和完整性。",
+      403: "MiMo 拒绝访问该模型或账户，请检查权限和账户状态。",
+      429: "MiMo 当前触发限流，请稍后再试。",
+    };
+    throw new PublicApiError(
+      messageByStatus[error.statusCode] ??
+        `MiMo API 返回 HTTP ${error.statusCode}，请稍后重试或检查账户状态。`,
+      error.statusCode,
+      error.statusCode >= 429,
+    );
   }
   throw new PublicApiError(
     "AI 调用失败，请检查 API Key、模型名称，以及该接口是否允许浏览器跨域访问。",
@@ -217,7 +231,7 @@ export async function expandInspiration(
     if (structuredOutputFailure(error)) {
       return repairExpansion(input, selection, [], signal);
     }
-    providerFailure(error, signal);
+    providerFailure(error, signal, selection);
   }
 }
 
@@ -245,7 +259,7 @@ export async function summarizeCollectedIdeas(
       sourceNodeIds: input.collectedIdeas.map((idea) => idea.id),
     });
   } catch (error) {
-    providerFailure(error, signal);
+    providerFailure(error, signal, selection);
   }
 }
 
@@ -274,7 +288,7 @@ export async function generateProjectPlan(
       sourceNodeIds: input.collectedIdeas.map((idea) => idea.id),
     });
   } catch (error) {
-    providerFailure(error, signal);
+    providerFailure(error, signal, selection);
   }
 }
 
@@ -303,7 +317,7 @@ export async function generateImagePrompt(
       sourceNodeIds: input.plan.sourceNodeIds,
     });
   } catch (error) {
-    providerFailure(error, signal);
+    providerFailure(error, signal, selection);
   }
 }
 
@@ -351,7 +365,7 @@ export async function analyzeImageAsset(
       ideas: filterDuplicateIdeas(generated.ideas, []).slice(0, 10),
     });
   } catch (error) {
-    if (!structuredOutputFailure(error)) providerFailure(error, signal);
+    if (!structuredOutputFailure(error)) providerFailure(error, signal, selection);
   }
 
   try {

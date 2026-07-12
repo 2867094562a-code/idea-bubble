@@ -111,6 +111,20 @@ describe("浏览器直连 BYOK", () => {
     expect(String(init?.body)).not.toContain(SENTINEL_KEY);
   });
 
+  it("MiMo exposes a safe actionable status without leaking upstream details", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: { message: `invalid ${SENTINEL_KEY}` } }), {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    await expect(expandInspiration(mimoRequest(), undefined, SENTINEL_KEY)).rejects.toMatchObject({
+      message: "MiMo 未接受该 API Key，请确认 Key 类型、有效期和完整性。",
+      status: 401,
+    });
+  });
+
   it("上游错误即使包含 Key 也只返回脱敏文案", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error(`network failed ${SENTINEL_KEY}`));
 
