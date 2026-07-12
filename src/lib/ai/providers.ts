@@ -32,7 +32,18 @@ function mimoProviderFetch(apiKey: string): typeof fetch {
     const headers = new Headers(init?.headers);
     headers.delete("authorization");
     headers.set("api-key", apiKey);
-    return privateProviderFetch(input, { ...init, headers });
+    let body = init?.body;
+    if (typeof body === "string") {
+      try {
+        const request = JSON.parse(body) as Record<string, unknown>;
+        request.response_format ??= { type: "json_object" };
+        body = JSON.stringify(request);
+      } catch {
+        // The SDK only sends JSON for Chat Completions. Preserve an unexpected
+        // body unchanged instead of risking a malformed user-funded request.
+      }
+    }
+    return privateProviderFetch(input, { ...init, headers, body });
   };
 }
 

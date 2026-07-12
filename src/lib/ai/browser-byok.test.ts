@@ -107,7 +107,7 @@ describe("浏览器直连 BYOK", () => {
     expect(headers.has("authorization")).toBe(false);
     const body = JSON.parse(String(init?.body));
     expect(body).toMatchObject({ model: "mimo-v2.5-pro" });
-    expect(body.response_format).toBeUndefined();
+    expect(body.response_format).toEqual({ type: "json_object" });
     expect(String(init?.body)).not.toContain(SENTINEL_KEY);
   });
 

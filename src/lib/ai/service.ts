@@ -99,9 +99,10 @@ async function generateStructured<T>(options: GenerateOptions<T>): Promise<T> {
   }
 
   if (options.selection.provider === "mimo") {
+    const outputContract = JSON.stringify(z.toJSONSchema(options.schema));
     const common = {
       model: options.selection.model,
-      system: `${options.system}\n${MIMO_JSON_SYSTEM_SUFFIX}`,
+      system: `${options.system}\n${MIMO_JSON_SYSTEM_SUFFIX}\n返回 JSON 必须符合以下契约：${outputContract}`,
       abortSignal: options.signal,
       maxRetries: 0,
     } as const;
