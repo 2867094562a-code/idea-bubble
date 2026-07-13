@@ -11,6 +11,7 @@ export function createImageJsonPrompt(prompt: Omit<ImagePrompt, "jsonPrompt">): 
       composition: prompt.composition,
       background: prompt.background,
       model_direction: prompt.modelDirection,
+      viewpoint: prompt.viewpoint,
       materials: prompt.materials,
       color_palette: prompt.colorPalette,
       lighting: prompt.lighting,

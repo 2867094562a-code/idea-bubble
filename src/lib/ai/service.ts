@@ -321,12 +321,22 @@ export async function generateImagePrompt(
       input.modelChoice === "required"
         ? "需要人物模特，呈现与目标用户相符的自然使用姿态和服装。"
         : "不需要人物模特，画面中不得出现人物。";
+    const viewpoint = {
+      front: "正视图",
+      side: "侧视图",
+      top: "俯视图",
+      low: "仰视图",
+      "three-quarter": "45° 三分之四视角",
+      detail: "局部细节特写",
+      isometric: "等距视图",
+    }[input.viewpointChoice];
     const prompt = {
       ...generated,
-      promptCN: `${generated.promptCN} 背景：${background} 人物模特：${modelDirection}`,
-      promptEN: `${generated.promptEN} Background: ${background} Model direction: ${modelDirection}`,
+      promptCN: `${generated.promptCN} 背景：${background} 人物模特：${modelDirection} 视角：${viewpoint}`,
+      promptEN: `${generated.promptEN} Background: ${background} Model direction: ${modelDirection} Viewpoint: ${viewpoint}`,
       background,
       modelDirection,
+      viewpoint,
       sourceIdeas: input.plan.coreIdeas,
       sourceNodeIds: input.plan.sourceNodeIds,
     };

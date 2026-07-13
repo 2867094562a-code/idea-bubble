@@ -75,6 +75,7 @@ interface IdeaStore {
   hydrated: boolean;
   collectionThreshold: number;
   busyTask?: "expand" | "summarize" | "plan" | "prompt" | "vision";
+  aiProgress: number;
   error?: string;
   past: Project[];
   future: Project[];
@@ -88,6 +89,7 @@ interface IdeaStore {
   clearAIConfig: () => void;
   setStage: (stage: WorkspaceStage) => void;
   setBusyTask: (task?: IdeaStore["busyTask"]) => void;
+  setAIProgress: (value: number) => void;
   setError: (error?: string) => void;
   setSelectedNode: (id?: string) => void;
   setCollectionThreshold: (value: number) => void;
@@ -189,6 +191,7 @@ export const useIdeaStore = create<IdeaStore>((set, get) => {
     saveStatus: "idle",
     hydrated: false,
     collectionThreshold: DEFAULT_COLLECTION_THRESHOLD,
+    aiProgress: 0,
     past: [],
     future: [],
 
@@ -274,6 +277,7 @@ export const useIdeaStore = create<IdeaStore>((set, get) => {
     },
     setStage: (stage) => set({ stage }),
     setBusyTask: (busyTask) => set({ busyTask }),
+    setAIProgress: (value) => set({ aiProgress: Math.min(100, Math.max(0, Math.round(value))) }),
     setError: (error) => set({ error }),
     setSelectedNode: (selectedNodeId) => set({ selectedNodeId }),
     setCollectionThreshold: (value) => {

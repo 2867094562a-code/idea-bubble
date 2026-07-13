@@ -119,6 +119,7 @@ export const imagePromptSchema = z.object({
   composition: z.string(),
   background: z.string().trim().min(1).default("未指定背景"),
   modelDirection: z.string().trim().min(1).default("未指定是否需要人物模特"),
+  viewpoint: z.string().trim().min(1).default("未指定视角"),
   materials: z.array(z.string()),
   colorPalette: z.array(z.string()),
   lighting: z.string(),
@@ -181,6 +182,9 @@ export const promptRequestSchema = z.object({
   ai: aiRequestConfigSchema,
   backgroundChoice: z.enum(["white", "studio", "scene"]).default("white"),
   modelChoice: z.enum(["none", "required"]).default("none"),
+  viewpointChoice: z
+    .enum(["front", "side", "top", "low", "three-quarter", "detail", "isometric"])
+    .default("three-quarter"),
 });
 
 export const analyzeAssetRequestSchema = z.object({

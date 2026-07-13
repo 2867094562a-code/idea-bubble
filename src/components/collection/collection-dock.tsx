@@ -24,6 +24,7 @@ export function CollectionDock({ project, onSummarize }: { project: Project; onS
   const toggleCollect = useIdeaStore((state) => state.toggleCollect);
   const clearCollection = useIdeaStore((state) => state.clearCollection);
   const busyTask = useIdeaStore((state) => state.busyTask);
+  const aiProgress = useIdeaStore((state) => state.aiProgress);
   const collected = selectCollectedNodes(project);
   const visible = useMemo(
     () => (sorted ? [...collected].sort((a, b) => a.category.localeCompare(b.category, "zh-CN")) : collected),
@@ -129,6 +130,15 @@ export function CollectionDock({ project, onSummarize }: { project: Project; onS
           </Button>
         </div>
       </div>
+      {busyTask === "summarize" && (
+        <div className="border-t border-white/10 px-4 pt-2 pb-3">
+          <div className="mb-1 flex justify-between text-[10px] text-slate-400">
+            <span>正在生成概念总结</span>
+            <span>{aiProgress}%</span>
+          </div>
+          <Progress value={aiProgress} className="h-1.5" />
+        </div>
+      )}
     </div>
   );
 }

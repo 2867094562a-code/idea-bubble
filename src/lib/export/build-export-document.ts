@@ -289,6 +289,7 @@ function imagePromptSection(prompt: ImagePrompt | undefined): ExportSection | un
       { label: "镜头", value: prompt.camera },
       { label: "背景", value: prompt.background },
       { label: "人物模特", value: prompt.modelDirection },
+      { label: "物品视角", value: prompt.viewpoint },
     ]),
     list("材质", prompt.materials),
     list("配色", prompt.colorPalette),

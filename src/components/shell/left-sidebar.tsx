@@ -16,9 +16,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import type { Project, ProjectInfo } from "@/lib/domain";
+import { MAX_PROJECT_NODES } from "@/lib/defaults";
 import { useIdeaStore } from "@/store/idea-store";
 
 export function LeftSidebar({
@@ -30,6 +32,8 @@ export function LeftSidebar({
 }) {
   const [text, setText] = useState("");
   const busyTask = useIdeaStore((state) => state.busyTask);
+  const aiProgress = useIdeaStore((state) => state.aiProgress);
+  const remainingNodes = MAX_PROJECT_NODES - project.nodes.length;
   const submit = () => {
     const value = text.trim();
     if (!value || busyTask) return;
@@ -88,6 +92,25 @@ export function LeftSidebar({
                 )}
                 生成 10 个灵感气泡
               </Button>
+              {busyTask === "expand" && (
+                <div className="space-y-1.5 px-1">
+                  <div className="flex justify-between text-[10px] text-slate-400">
+                    <span>正在生成灵感</span>
+                    <span>{aiProgress}%</span>
+                  </div>
+                  <Progress value={aiProgress} className="h-1.5" />
+                </div>
+              )}
+              <p
+                className={
+                  remainingNodes <= 20
+                    ? "text-center text-[10px] text-amber-300"
+                    : "text-center text-[10px] text-slate-600"
+                }
+              >
+                节点容量：{project.nodes.length}/{MAX_PROJECT_NODES}（剩余 {remainingNodes}）
+                {remainingNodes <= 20 ? "，请整理或删除分支后继续。" : ""}
+              </p>
               <p className="text-center font-mono text-[8px] text-slate-600">⌘ / CTRL + ENTER</p>
             </TabsContent>
             <TabsContent value="media" className="mt-3">

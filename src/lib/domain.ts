@@ -3,6 +3,8 @@ export type AIProviderId = "openai" | "google" | "deepseek" | "mimo" | "openai-c
 export type AITask = "expand" | "summary" | "plan" | "prompt" | "vision";
 export type ImageBackgroundChoice = "white" | "studio" | "scene";
 export type ImageModelChoice = "none" | "required";
+export type ImageViewpointChoice =
+  "front" | "side" | "top" | "low" | "three-quarter" | "detail" | "isometric";
 
 export type AIModelSettings = Record<AITask, string>;
 
@@ -139,6 +141,7 @@ export interface ImagePrompt {
   composition: string;
   background: string;
   modelDirection: string;
+  viewpoint: string;
   materials: string[];
   colorPalette: string[];
   lighting: string;

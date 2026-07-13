@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BookmarkPlus, CheckCircle2, Copy, Download, ImagePlus, LoaderCircle, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,13 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { ImageBackgroundChoice, ImageModelChoice, Project, ProjectPlan } from "@/lib/domain";
+import type {
+  ImageBackgroundChoice,
+  ImageModelChoice,
+  ImageViewpointChoice,
+  Project,
+  ProjectPlan,
+} from "@/lib/domain";
 import { createImageJsonPrompt } from "@/lib/image-prompt-format";
 import { useIdeaStore } from "@/store/idea-store";
 
@@ -66,6 +72,7 @@ export function PlanEditor({
   onGeneratePrompt: (options: {
     backgroundChoice: ImageBackgroundChoice;
     modelChoice: ImageModelChoice;
+    viewpointChoice: ImageViewpointChoice;
   }) => void;
 }) {
   const plan = project.currentPlan;
@@ -79,6 +86,12 @@ export function PlanEditor({
   const prompt = project.imagePromptVersions[0];
   const [backgroundChoice, setBackgroundChoice] = useState<ImageBackgroundChoice>("white");
   const [modelChoice, setModelChoice] = useState<ImageModelChoice>("none");
+  const [viewpointChoice, setViewpointChoice] = useState<ImageViewpointChoice>("three-quarter");
+  const promptRef = useRef<HTMLDivElement>(null);
+  const promptId = prompt?.id;
+  useEffect(() => {
+    if (promptId) promptRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [promptId]);
   if (!plan) return null;
 
   return (
@@ -114,6 +127,23 @@ export function PlanEditor({
               <SelectItem value="required">需要模特</SelectItem>
             </SelectContent>
           </Select>
+          <Select
+            value={viewpointChoice}
+            onValueChange={(value) => setViewpointChoice(value as ImageViewpointChoice)}
+          >
+            <SelectTrigger className="h-8 w-[142px] text-xs">
+              <SelectValue placeholder="物品视角" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="front">正视</SelectItem>
+              <SelectItem value="side">侧视</SelectItem>
+              <SelectItem value="top">俯视</SelectItem>
+              <SelectItem value="low">仰视</SelectItem>
+              <SelectItem value="three-quarter">45° 视角</SelectItem>
+              <SelectItem value="detail">细节特写</SelectItem>
+              <SelectItem value="isometric">等距视图</SelectItem>
+            </SelectContent>
+          </Select>
           <Button variant="outline" size="sm" onClick={() => savePlanVersion()}>
             <BookmarkPlus className="size-4" />
             保存版本
@@ -122,7 +152,7 @@ export function PlanEditor({
             variant="outline"
             size="sm"
             disabled={Boolean(busyTask)}
-            onClick={() => onGeneratePrompt({ backgroundChoice, modelChoice })}
+            onClick={() => onGeneratePrompt({ backgroundChoice, modelChoice, viewpointChoice })}
           >
             {busyTask === "prompt" ? (
               <LoaderCircle className="size-4 animate-spin" />
@@ -256,7 +286,7 @@ export function PlanEditor({
           </Card>
 
           {prompt && (
-            <Card className="border-[#ffb28b]/20 bg-[#ffb28b]/[0.035]">
+            <Card ref={promptRef} className="border-[#ffb28b]/20 bg-[#ffb28b]/[0.035]">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Sparkles className="size-4 text-[#ffb28b]" />
@@ -289,6 +319,10 @@ export function PlanEditor({
                 <div>
                   <Label className="mb-2 block text-xs">人物模特</Label>
                   <Textarea value={prompt.data.modelDirection} readOnly rows={3} />
+                </div>
+                <div>
+                  <Label className="mb-2 block text-xs">物品视角</Label>
+                  <Textarea value={prompt.data.viewpoint} readOnly rows={3} />
                 </div>
               </CardContent>
             </Card>

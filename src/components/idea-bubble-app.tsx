@@ -22,6 +22,7 @@ import type {
   AIProviderConfig,
   ImageBackgroundChoice,
   ImageModelChoice,
+  ImageViewpointChoice,
   ProjectInfo,
   WorkspaceStage,
 } from "@/lib/domain";
@@ -63,6 +64,7 @@ export function IdeaBubbleApp() {
   const saveNow = useIdeaStore((state) => state.saveNow);
   const addExpansion = useIdeaStore((state) => state.addExpansion);
   const setBusyTask = useIdeaStore((state) => state.setBusyTask);
+  const setAIProgress = useIdeaStore((state) => state.setAIProgress);
   const setConcept = useIdeaStore((state) => state.setConcept);
   const setPlan = useIdeaStore((state) => state.setPlan);
   const saveImagePrompt = useIdeaStore((state) => state.saveImagePrompt);
@@ -74,6 +76,7 @@ export function IdeaBubbleApp() {
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
   const activeRequestRef = useRef<ActiveRequest | undefined>(undefined);
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   useEffect(() => {
     void hydrate();
@@ -90,10 +93,17 @@ export function IdeaBubbleApp() {
       };
       activeRequestRef.current = request;
       setBusyTask(task);
+      setAIProgress(8);
+      progressTimerRef.current = setInterval(() => {
+        const progress = useIdeaStore.getState().aiProgress;
+        useIdeaStore
+          .getState()
+          .setAIProgress(Math.min(92, progress + Math.max(1, Math.round((92 - progress) / 5))));
+      }, 650);
       setError(undefined);
       return request;
     },
-    [setBusyTask, setError],
+    [setAIProgress, setBusyTask, setError],
   );
 
   const requestIsCurrent = useCallback(
@@ -107,9 +117,12 @@ export function IdeaBubbleApp() {
     (request: ActiveRequest) => {
       if (activeRequestRef.current?.token !== request.token) return;
       activeRequestRef.current = undefined;
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+      progressTimerRef.current = undefined;
+      setAIProgress(0);
       setBusyTask(undefined);
     },
-    [setBusyTask],
+    [setAIProgress, setBusyTask],
   );
 
   const cancelActiveRequest = useCallback(() => {
@@ -117,8 +130,11 @@ export function IdeaBubbleApp() {
     if (!request) return;
     activeRequestRef.current = undefined;
     request.controller.abort();
+    if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    progressTimerRef.current = undefined;
+    setAIProgress(0);
     setBusyTask(undefined);
-  }, [setBusyTask]);
+  }, [setAIProgress, setBusyTask]);
 
   const saveAIConfig = useCallback(
     (config: AIProviderConfig) => {
@@ -262,7 +278,11 @@ export function IdeaBubbleApp() {
   }, [aiConfig, beginRequest, finishRequest, requestIsCurrent, setError, setPlan, setStage]);
 
   const generatePrompt = useCallback(
-    async (options: { backgroundChoice: ImageBackgroundChoice; modelChoice: ImageModelChoice }) => {
+    async (options: {
+      backgroundChoice: ImageBackgroundChoice;
+      modelChoice: ImageModelChoice;
+      viewpointChoice: ImageViewpointChoice;
+    }) => {
       const current = useIdeaStore.getState().project;
       if (!current?.currentPlan) return;
       const request = beginRequest("prompt", current.id);

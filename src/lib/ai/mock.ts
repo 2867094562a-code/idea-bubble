@@ -319,15 +319,25 @@ export function generateMockImagePrompt(input: PromptInput): ImagePrompt {
     input.modelChoice === "required"
       ? "需要一位与目标用户相符的人物模特，以自然站姿或使用姿态呈现产品尺度和交互。"
       : "无需人物模特；以单一产品主体和尺度参照呈现。";
+  const viewpoint = {
+    front: "正视图",
+    side: "侧视图",
+    top: "俯视图",
+    low: "仰视图",
+    "three-quarter": "45° 三分之四视角",
+    detail: "局部细节特写",
+    isometric: "等距视图",
+  }[input.viewpointChoice];
 
   const prompt = {
-    promptCN: `${subject}概念设计，以${ideas.join("、")}为核心，圆润克制的未来形态，模块化结构，细腻雾面与半透明材质，清晰层级，真实产品摄影质感，柔和侧光，高细节。背景：${background} 人物模特：${modelDirection}`,
-    promptEN: `${subject} concept design, inspired by ${ideas.join(", ")}, restrained rounded futuristic form, modular structure, refined matte and translucent materials, clear visual hierarchy, realistic product photography, soft side lighting, high detail. Background: ${background} Model direction: ${modelDirection}`,
+    promptCN: `${subject}概念设计，以${ideas.join("、")}为核心，圆润克制的未来形态，模块化结构，细腻雾面与半透明材质，清晰层级，真实产品摄影质感，柔和侧光，高细节。背景：${background} 人物模特：${modelDirection} 视角：${viewpoint}`,
+    promptEN: `${subject} concept design, inspired by ${ideas.join(", ")}, restrained rounded futuristic form, modular structure, refined matte and translucent materials, clear visual hierarchy, realistic product photography, soft side lighting, high detail. Background: ${background} Model direction: ${modelDirection} Viewpoint: ${viewpoint}`,
     subject,
     style: "克制的未来主义产品设计",
     composition: "主体居中偏下，三分之二视角，留出充足负空间",
     background,
     modelDirection,
+    viewpoint,
     materials: input.plan.materialsOrResources.slice(0, 6),
     colorPalette: input.plan.colorDirection.slice(0, 6),
     lighting: "柔和大面积侧光，边缘有轻微轮廓光",

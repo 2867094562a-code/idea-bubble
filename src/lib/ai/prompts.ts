@@ -102,8 +102,9 @@ export function imagePromptPrompt(input: PromptInput): {
       `项目计划：${JSON.stringify(input.plan)}`,
       `用户指定背景：${{ white: "纯白无缝背景", studio: "有层次的影棚背景", scene: "与项目匹配的具体场景背景" }[input.backgroundChoice]}`,
       `用户指定人物模特：${input.modelChoice === "required" ? "必须包含人物模特并描述其身份、姿态和服装" : "不需要人物模特，画面中不得出现人物"}`,
+      `用户指定物品视角：${{ front: "正视", side: "侧视", top: "俯视", low: "仰视", "three-quarter": "45° 三分之四视角", detail: "局部细节特写", isometric: "等距视图" }[input.viewpointChoice]}`,
       "中英文提示词需语义一致，并明确主体、风格、构图、材质、色彩、光线、镜头、背景和负面提示。",
-      "background 必须明确选择纯白/纯色背景、影棚背景或具体环境背景；modelDirection 必须明确“无需人物模特”或描述需要的模特人数、身份、姿态与服装，禁止含糊表述。",
+      "background 必须明确选择纯白/纯色背景、影棚背景或具体环境背景；modelDirection 必须明确“无需人物模特”或描述需要的模特人数、身份、姿态与服装；viewpoint 必须严格采用用户指定的物品视角，禁止含糊表述。",
       "sourceIdeas 和 sourceNodeIds 只能来自项目计划。",
     ].join("\n"),
   };

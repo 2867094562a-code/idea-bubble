@@ -1,12 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Brain, LoaderCircle, MousePointer2, Sparkles } from "lucide-react";
+import {
+  Brain,
+  LoaderCircle,
+  Map as MapIcon,
+  Maximize2,
+  Minimize2,
+  MousePointer2,
+  Sparkles,
+} from "lucide-react";
 import {
   Background,
   BackgroundVariant,
   Controls,
-  MiniMap,
   ReactFlow,
   type Edge,
   type ReactFlowInstance,
@@ -74,8 +81,10 @@ export function InspirationCanvas({
     () => undefined,
   );
   const flowRef = useRef<ReactFlowInstance<BubbleFlowNode, Edge> | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
   const previousNodeCount = useRef(project.nodes.length);
   const [flights, setFlights] = useState<CollectionFlight[]>([]);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(
     () => () => {
@@ -83,6 +92,22 @@ export function InspirationCanvas({
     },
     [],
   );
+
+  useEffect(() => {
+    const syncFullscreen = () => setIsFullscreen(document.fullscreenElement === canvasRef.current);
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await canvasRef.current?.requestFullscreen();
+      window.setTimeout(() => void flowRef.current?.fitView({ padding: 0.18, duration: 220 }), 60);
+    } catch {
+      // Fullscreen may be disabled by the host browser; the normal canvas stays usable.
+    }
+  }, []);
 
   useEffect(() => {
     const previous = previousNodeCount.current;
@@ -295,7 +320,7 @@ export function InspirationCanvas({
   }, [onSurfacePointerDown]);
 
   return (
-    <div className="relative size-full min-h-[430px] overflow-hidden bg-[#09111d]">
+    <div ref={canvasRef} className="relative size-full min-h-[430px] overflow-hidden bg-[#09111d]">
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-between p-4">
         <div className="flex items-center gap-2">
           <Badge
@@ -362,15 +387,15 @@ export function InspirationCanvas({
           position="bottom-left"
           className="!bottom-32 !overflow-hidden !rounded-xl !border-white/10 !bg-[#111926] !fill-slate-300 !shadow-xl"
         />
-        <MiniMap
-          position="bottom-right"
-          className="!right-3 !bottom-32 !h-20 !w-28 !rounded-xl !border !border-white/10 !bg-[#0a111c]"
-          maskColor="rgba(7,12,20,.72)"
-          nodeColor={(node) => (node.id === selectedNodeId ? "#a8ffcb" : "#5c7089")}
-          pannable
-          zoomable
-        />
       </ReactFlow>
+
+      <CanvasOverview
+        nodes={nodes}
+        selectedNodeId={selectedNodeId}
+        onNavigate={(x, y) => void flowRef.current?.setCenter(x, y, { zoom: 0.8, duration: 260 })}
+        isFullscreen={isFullscreen}
+        onFullscreenToggle={() => void toggleFullscreen()}
+      />
 
       {project.nodes.length === 0 && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-8">
@@ -409,6 +434,73 @@ export function InspirationCanvas({
           {flight.word}
         </div>
       ))}
+    </div>
+  );
+}
+
+function CanvasOverview({
+  nodes,
+  selectedNodeId,
+  onNavigate,
+  isFullscreen,
+  onFullscreenToggle,
+}: {
+  nodes: BubbleFlowNode[];
+  selectedNodeId?: string;
+  onNavigate: (x: number, y: number) => void;
+  isFullscreen: boolean;
+  onFullscreenToggle: () => void;
+}) {
+  const extent = nodes.reduce(
+    (value, node) => ({
+      minX: Math.min(value.minX, node.position.x),
+      maxX: Math.max(value.maxX, node.position.x),
+      minY: Math.min(value.minY, node.position.y),
+      maxY: Math.max(value.maxY, node.position.y),
+    }),
+    { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity },
+  );
+  const width = Math.max(1, extent.maxX - extent.minX);
+  const height = Math.max(1, extent.maxY - extent.minY);
+
+  return (
+    <div className="absolute right-3 bottom-32 z-20 w-32 overflow-hidden rounded-xl border border-white/10 bg-[#0a111c]/95 shadow-xl backdrop-blur">
+      <button
+        type="button"
+        aria-label="在总览中定位画布"
+        className="relative block h-20 w-full cursor-crosshair bg-[radial-gradient(circle_at_1px_1px,rgba(172,194,220,.16)_1px,transparent_0)] bg-[size:10px_10px]"
+        onClick={(event) => {
+          if (!nodes.length) return;
+          const rect = event.currentTarget.getBoundingClientRect();
+          const ratioX = (event.clientX - rect.left) / rect.width;
+          const ratioY = (event.clientY - rect.top) / rect.height;
+          onNavigate(extent.minX + width * ratioX, extent.minY + height * ratioY);
+        }}
+      >
+        {nodes.map((node) => (
+          <span
+            key={node.id}
+            className={
+              node.id === selectedNodeId
+                ? "absolute size-2 rounded-full bg-[#a8ffcb] shadow-[0_0_8px_#a8ffcb]"
+                : "absolute size-1.5 rounded-full bg-slate-400/80"
+            }
+            style={{
+              left: `${8 + ((node.position.x - extent.minX) / width) * 84}%`,
+              top: `${8 + ((node.position.y - extent.minY) / height) * 84}%`,
+            }}
+          />
+        ))}
+        {!nodes.length && <MapIcon className="absolute inset-0 m-auto size-4 text-slate-600" />}
+      </button>
+      <button
+        type="button"
+        onClick={onFullscreenToggle}
+        className="flex h-8 w-full items-center justify-center gap-1.5 border-t border-white/10 text-[10px] text-slate-300 transition-colors hover:bg-white/[0.06]"
+      >
+        {isFullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+        {isFullscreen ? "退出沉浸" : "沉浸思考"}
+      </button>
     </div>
   );
 }
