@@ -82,6 +82,7 @@ interface IdeaStore {
   hydrate: () => Promise<void>;
   createNewProject: (info: ProjectInfo) => void;
   loadProject: (project: Project) => void;
+  deleteProject: (id: string) => Promise<void>;
   updateProjectInfo: (patch: Partial<ProjectInfo>) => void;
   setAIConfig: (config: AIProviderConfig) => void;
   clearAIConfig: () => void;
@@ -236,6 +237,25 @@ export const useIdeaStore = create<IdeaStore>((set, get) => {
         future: [],
         saveStatus: "saved",
       }),
+
+    deleteProject: async (id) => {
+      const timer = saveTimers.get(id);
+      if (timer) clearTimeout(timer);
+      saveTimers.delete(id);
+      pendingProjects.delete(id);
+      await projectRepository.delete(id);
+
+      if (get().project?.id !== id) return;
+      const next = await projectRepository.getLatest();
+      set({
+        project: next,
+        selectedNodeId: undefined,
+        stage: next?.currentPlan ? "plan" : next?.currentConcept ? "concept" : "canvas",
+        past: [],
+        future: [],
+        saveStatus: next ? "saved" : "idle",
+      });
+    },
 
     updateProjectInfo: (patch) => mutateProject((project) => Object.assign(project.info, patch)),
     setAIConfig: (config) => {

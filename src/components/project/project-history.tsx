@@ -20,6 +20,7 @@ export function ProjectHistory({
   const [projects, setProjects] = useState<Project[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const loadProject = useIdeaStore((state) => state.loadProject);
+  const deleteProject = useIdeaStore((state) => state.deleteProject);
   const current = useIdeaStore((state) => state.project);
 
   const refresh = async () => {
@@ -142,10 +143,9 @@ export function ProjectHistory({
                     variant="ghost"
                     title="删除项目"
                     className="text-slate-500 hover:text-red-400"
-                    disabled={project.id === current?.id}
                     onClick={async () => {
                       if (!window.confirm(`确定删除“${project.info.name}”吗？此操作不可撤销。`)) return;
-                      await projectRepository.delete(project.id);
+                      await deleteProject(project.id);
                       await refresh();
                     }}
                   >
