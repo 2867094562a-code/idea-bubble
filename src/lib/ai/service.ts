@@ -332,8 +332,9 @@ export async function generateImagePrompt(
     }[input.viewpointChoice];
     const prompt = {
       ...generated,
-      promptCN: `${generated.promptCN} 背景：${background} 人物模特：${modelDirection} 视角：${viewpoint}`,
-      promptEN: `${generated.promptEN} Background: ${background} Model direction: ${modelDirection} Viewpoint: ${viewpoint}`,
+      subject: input.projectInfo.designObject,
+      promptCN: `${generated.promptCN} 设计物品主体：${input.projectInfo.designObject}。背景：${background} 人物模特：${modelDirection} 视角：${viewpoint}`,
+      promptEN: `${generated.promptEN} Design object subject: ${input.projectInfo.designObject}. Background: ${background} Model direction: ${modelDirection} Viewpoint: ${viewpoint}`,
       background,
       modelDirection,
       viewpoint,

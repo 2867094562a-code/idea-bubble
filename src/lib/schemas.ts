@@ -131,6 +131,7 @@ export const imagePromptSchema = z.object({
 
 export const projectInfoSchema = z.object({
   name: z.string().trim().min(1).max(80),
+  designObject: z.string().trim().max(120).default(""),
   type: z.enum(["鞋类设计", "产品设计", "品牌设计", "平面视觉", "视频创意", "通用头脑风暴", "自定义"]),
   customType: z.string().max(40).optional(),
   goal: z.string().max(500),

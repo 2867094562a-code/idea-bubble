@@ -131,6 +131,7 @@ function projectInfoSection(project: Project): ExportSection | undefined {
   const customType = project.info.type === "自定义" ? cleanText(project.info.customType) : "";
   const block = keyValues(undefined, [
     { label: "项目名称", value: project.info.name },
+    { label: "要设计的物品", value: project.info.designObject },
     { label: "项目类型", value: customType || project.info.type },
     { label: "项目目标", value: project.info.goal },
     { label: "目标人群", value: project.info.audience },

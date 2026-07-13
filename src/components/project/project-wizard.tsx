@@ -22,6 +22,7 @@ const projectTypes: ProjectType[] = [
 
 const initialInfo: ProjectInfo = {
   name: "",
+  designObject: "",
   type: "通用头脑风暴",
   customType: "",
   goal: "",
@@ -86,8 +87,8 @@ export function ProjectWizard({
             className="space-y-5 p-6 md:p-8"
             onSubmit={(event) => {
               event.preventDefault();
-              if (!info.name.trim()) return;
-              onCreate({ ...info, name: info.name.trim() });
+              if (!info.name.trim() || !info.designObject.trim()) return;
+              onCreate({ ...info, name: info.name.trim(), designObject: info.designObject.trim() });
               onOpenChange(false);
             }}
           >
@@ -116,6 +117,17 @@ export function ProjectWizard({
                 </Select>
               </Field>
             </div>
+            <Field label="要设计的物品" required>
+              <Input
+                value={info.designObject}
+                onChange={(event) => update("designObject", event.target.value)}
+                placeholder="例如：城市通勤鞋、桌面台灯、保温杯"
+                maxLength={120}
+              />
+              <p className="text-[11px] leading-4 text-slate-500">
+                用于最终生图提示词的主体判断；创建后仍可随时修改。
+              </p>
+            </Field>
             {info.type === "自定义" && (
               <Field label="自定义类型">
                 <Input
@@ -176,7 +188,7 @@ export function ProjectWizard({
               )}
               <Button
                 type="submit"
-                disabled={!info.name.trim()}
+                disabled={!info.name.trim() || !info.designObject.trim()}
                 className="bg-[#a8ffcb] text-[#07120d] hover:bg-[#91efb7]"
               >
                 创建灵感空间

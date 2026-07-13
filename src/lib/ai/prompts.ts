@@ -100,6 +100,7 @@ export function imagePromptPrompt(input: PromptInput): {
     prompt: [
       `项目信息：${JSON.stringify(input.projectInfo)}`,
       `项目计划：${JSON.stringify(input.plan)}`,
+      `要设计的物品（必须作为画面主体）：${input.projectInfo.designObject}`,
       `用户指定背景：${{ white: "纯白无缝背景", studio: "有层次的影棚背景", scene: "与项目匹配的具体场景背景" }[input.backgroundChoice]}`,
       `用户指定人物模特：${input.modelChoice === "required" ? "必须包含人物模特并描述其身份、姿态和服装" : "不需要人物模特，画面中不得出现人物"}`,
       `用户指定物品视角：${{ front: "正视", side: "侧视", top: "俯视", low: "仰视", "three-quarter": "45° 三分之四视角", detail: "局部细节特写", isometric: "等距视图" }[input.viewpointChoice]}`,

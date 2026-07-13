@@ -285,6 +285,10 @@ export function IdeaBubbleApp() {
     }) => {
       const current = useIdeaStore.getState().project;
       if (!current?.currentPlan) return;
+      if (!current.info.designObject.trim()) {
+        setError("请先在项目资料中填写“要设计的物品”，再生成生图提示词。");
+        return;
+      }
       const request = beginRequest("prompt", current.id);
       if (!request) return;
       try {

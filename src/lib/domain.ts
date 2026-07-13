@@ -30,6 +30,7 @@ export interface AIRequestConfig {
 
 export interface ProjectInfo {
   name: string;
+  designObject: string;
   type: ProjectType;
   customType?: string;
   goal: string;

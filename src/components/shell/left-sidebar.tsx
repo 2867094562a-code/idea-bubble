@@ -185,6 +185,16 @@ function ProjectInfoCard({ project }: { project: Project }) {
               <InfoField label="项目类型">
                 <Input value={draft.type} disabled />
               </InfoField>
+              <InfoField label="要设计的物品" wide>
+                <Input
+                  value={draft.designObject}
+                  onChange={(event) => update("designObject", event.target.value.slice(0, 120))}
+                  placeholder="例如：城市通勤鞋、桌面台灯、保温杯"
+                />
+                <p className="text-[11px] text-slate-500">
+                  此项会决定最终生图提示词的主体，可在灵感发散中途修改。
+                </p>
+              </InfoField>
               <InfoField label="项目目标" wide>
                 <Textarea value={draft.goal} onChange={(event) => update("goal", event.target.value)} />
               </InfoField>

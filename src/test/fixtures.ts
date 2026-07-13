@@ -99,6 +99,7 @@ export function fixtureProject(): Project {
   return {
     id: "project-hive",
     info: {
+      designObject: "通勤水杯",
       name: "蜂巢通勤概念",
       type: "产品设计",
       customType: "",

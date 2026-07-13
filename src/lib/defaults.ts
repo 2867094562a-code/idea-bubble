@@ -41,6 +41,7 @@ export function createProject(info?: Partial<ProjectInfo>): Project {
     id: crypto.randomUUID(),
     info: {
       name: info?.name || "未命名灵感项目",
+      designObject: info?.designObject || "",
       type: info?.type || "通用头脑风暴",
       customType: info?.customType || "",
       goal: info?.goal || "",

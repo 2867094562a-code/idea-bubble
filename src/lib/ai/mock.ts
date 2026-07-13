@@ -308,7 +308,7 @@ export function generateMockPlan(input: PlanInput): ProjectPlan {
 
 export function generateMockImagePrompt(input: PromptInput): ImagePrompt {
   const ideas = input.plan.coreIdeas.slice(0, 8);
-  const subject = input.plan.projectName;
+  const subject = input.projectInfo.designObject || input.plan.projectName;
   const forbidden = input.projectInfo.forbiddenElements.trim();
   const background = {
     white: "纯白无缝影棚背景，地面保留极浅柔影，突出产品轮廓与材质。",
