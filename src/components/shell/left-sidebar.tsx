@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, Image as ImageIcon, LoaderCircle, Pencil, Plus, Sparkles } from "lucide-react";
+import { FileText, Image as ImageIcon, LoaderCircle, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import { AssetUploader } from "@/components/media/asset-uploader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -157,6 +157,7 @@ export function LeftSidebar({
 
 function ProjectInfoCard({ project }: { project: Project }) {
   const updateProjectInfo = useIdeaStore((state) => state.updateProjectInfo);
+  const deleteProject = useIdeaStore((state) => state.deleteProject);
   const [draft, setDraft] = useState<ProjectInfo>(project.info);
   const update = <K extends keyof ProjectInfo>(field: K, value: ProjectInfo[K]) =>
     setDraft((current) => ({ ...current, [field]: value }));
@@ -217,10 +218,24 @@ function ProjectInfoCard({ project }: { project: Project }) {
                 />
               </InfoField>
             </div>
-            <Button className="ml-auto bg-[#a8ffcb] text-[#07120d]" onClick={() => updateProjectInfo(draft)}>
-              <Plus className="size-4" />
-              保存资料
-            </Button>
+            <div className="flex items-center justify-between gap-3">
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-red-300 hover:bg-red-400/10 hover:text-red-200"
+                onClick={async () => {
+                  if (!window.confirm(`确定删除“${project.info.name}”吗？此操作不可撤销。`)) return;
+                  await deleteProject(project.id);
+                }}
+              >
+                <Trash2 className="size-4" />
+                删除项目
+              </Button>
+              <Button className="bg-[#a8ffcb] text-[#07120d]" onClick={() => updateProjectInfo(draft)}>
+                <Plus className="size-4" />
+                保存资料
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

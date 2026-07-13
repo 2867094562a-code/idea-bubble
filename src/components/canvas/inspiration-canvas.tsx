@@ -19,6 +19,7 @@ import {
   type ReactFlowInstance,
 } from "@xyflow/react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { Project } from "@/lib/domain";
 import { useIdeaStore } from "@/store/idea-store";
 import { BubbleNode, type BubbleFlowNode } from "@/components/canvas/bubble-node";
@@ -158,6 +159,11 @@ export function InspirationCanvas({
   const parentIds = useMemo(
     () => new Set(project.nodes.flatMap((node) => (node.parentId ? [node.parentId] : []))),
     [project.nodes],
+  );
+
+  const selectedNode = useMemo(
+    () => project.nodes.find((node) => node.id === selectedNodeId),
+    [project.nodes, selectedNodeId],
   );
 
   const nodes = useMemo<BubbleFlowNode[]>(
@@ -343,6 +349,32 @@ export function InspirationCanvas({
           </div>
         )}
       </div>
+
+      {isFullscreen && project.nodes.length > 0 && (
+        <div className="pointer-events-none absolute top-4 left-1/2 z-20 w-[min(30rem,calc(100%-2rem))] -translate-x-1/2">
+          <div className="pointer-events-auto flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#0a111c]/95 px-3 py-2 shadow-xl backdrop-blur">
+            <div className="min-w-0">
+              <p className="text-[10px] text-slate-500">沉浸式发散</p>
+              <p className="truncate text-xs text-slate-200">
+                {selectedNode ? `以「${selectedNode.word}」为起点` : "先单击选择一个气泡"}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              className="shrink-0 bg-[#a8ffcb] text-[#07120d] hover:bg-[#91efb7]"
+              disabled={!selectedNode || Boolean(busyTask)}
+              onClick={() => selectedNode && onExpand(selectedNode.word, selectedNode.id)}
+            >
+              {busyTask === "expand" ? (
+                <LoaderCircle className="size-4 animate-spin" />
+              ) : (
+                <Sparkles className="size-4" />
+              )}
+              生成 10 个气泡
+            </Button>
+          </div>
+        </div>
+      )}
 
       <ReactFlow<BubbleFlowNode, Edge>
         nodes={nodes}
