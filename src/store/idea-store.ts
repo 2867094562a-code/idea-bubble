@@ -9,6 +9,7 @@ import type {
   ExportPreset,
   ImagePrompt,
   InspirationIdea,
+  InspirationNode,
   Project,
   ProjectInfo,
   ProjectPlan,
@@ -25,11 +26,62 @@ import { normalizeIdeaWord } from "@/lib/idea-normalization";
 import { projectRepository, readCollectionThreshold, writeCollectionThreshold } from "@/lib/repository";
 
 const HISTORY_LIMIT = 30;
+const BUBBLE_GAP = 32;
+const MAX_LAYOUT_RINGS = 14;
 const saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const pendingProjects = new Map<string, Project>();
 
 function cloneProject(project: Project): Project {
   return structuredClone(project);
+}
+
+function bubbleDiameter(node: Pick<InspirationNode, "depth" | "relevance">): number {
+  return node.depth === 0 ? 148 : Math.round(96 + node.relevance * 28);
+}
+
+interface OccupiedBubble {
+  x: number;
+  y: number;
+  diameter: number;
+}
+
+function placeBubble(
+  parent: InspirationNode,
+  targetAngle: number,
+  diameter: number,
+  initialRadius: number,
+  occupied: OccupiedBubble[],
+): { x: number; y: number } {
+  const parentDiameter = bubbleDiameter(parent);
+  const parentCenter = {
+    x: parent.position.x + parentDiameter / 2,
+    y: parent.position.y + parentDiameter / 2,
+  };
+  const offsets = [0, 0.16, -0.16, 0.32, -0.32, 0.5, -0.5, 0.7, -0.7, 0.92, -0.92];
+
+  for (let ring = 0; ring < MAX_LAYOUT_RINGS; ring += 1) {
+    const radius = initialRadius + ring * 92;
+    for (const offset of offsets) {
+      const angle = targetAngle + offset;
+      const center = {
+        x: parentCenter.x + Math.cos(angle) * radius,
+        y: parentCenter.y + Math.sin(angle) * radius,
+      };
+      const collides = occupied.some((item) => {
+        const minimumDistance = (diameter + item.diameter) / 2 + BUBBLE_GAP;
+        return Math.hypot(center.x - item.x, center.y - item.y) < minimumDistance;
+      });
+      if (!collides) return { x: center.x - diameter / 2, y: center.y - diameter / 2 };
+    }
+  }
+
+  // This only occurs on a deliberately very dense canvas. Keep expanding outward
+  // rather than placing a new bubble on top of an existing one.
+  const fallbackRadius = initialRadius + MAX_LAYOUT_RINGS * 92;
+  return {
+    x: parentCenter.x + Math.cos(targetAngle) * fallbackRadius - diameter / 2,
+    y: parentCenter.y + Math.sin(targetAngle) * fallbackRadius - diameter / 2,
+  };
 }
 
 type PlanTextField = Exclude<
@@ -333,33 +385,37 @@ export const useIdeaStore = create<IdeaStore>((set, get) => {
           : undefined;
         const existingChildCount = project.nodes.filter((node) => node.parentId === parent.id).length;
         const batchNumber = Math.floor(existingChildCount / 10);
-        const baseRadius = depth === 1 ? 228 : Math.min(420, 240 + depth * 50);
-        const radius = Math.min(600, baseRadius + batchNumber * 90);
+        const baseRadius = depth === 1 ? 300 : Math.min(520, 300 + depth * 60);
+        const radius = baseRadius + batchNumber * 110;
         const outwardAngle = grandparent
           ? Math.atan2(parent.position.y - grandparent.position.y, parent.position.x - grandparent.position.x)
           : -Math.PI / 2;
         const fanSpread = Math.PI * 1.5;
+        const occupied: OccupiedBubble[] = project.nodes.map((node) => {
+          const diameter = bubbleDiameter(node);
+          return { x: node.position.x + diameter / 2, y: node.position.y + diameter / 2, diameter };
+        });
         uniqueIdeas.forEach((idea, index) => {
           const angle =
             depth === 1
               ? (Math.PI * 2 * index) / uniqueIdeas.length - Math.PI / 2
               : outwardAngle - fanSpread / 2 + (fanSpread * index) / Math.max(1, uniqueIdeas.length - 1);
+          const diameter = bubbleDiameter({ depth, relevance: idea.relevance });
+          const position = placeBubble(parent!, angle, diameter, radius, occupied);
           const id = crypto.randomUUID();
           project.nodes.push({
             ...idea,
             id,
             parentId: parent!.id,
             sourceAssetId: sourceAssetId || parent!.sourceAssetId,
-            position: {
-              x: parent!.position.x + Math.cos(angle) * radius,
-              y: parent!.position.y + Math.sin(angle) * radius,
-            },
+            position,
             depth,
             collected: false,
             locked: false,
             collapsed: false,
             createdAt: new Date().toISOString(),
           });
+          occupied.push({ x: position.x + diameter / 2, y: position.y + diameter / 2, diameter });
           project.edges.push({ id: `${parent!.id}-${id}`, source: parent!.id, target: id });
         });
       }),
